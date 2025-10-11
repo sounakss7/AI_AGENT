@@ -129,8 +129,8 @@ def file_analysis_tool(question: str, file_content_as_text: str, google_api_key:
 
 class AgentState(TypedDict):
     query: str
+    route: str  # Add this key to store the router's decision
     final_response: Optional[any]
-
 # These are wrapper functions for the nodes to handle passing state and API keys
 def call_comparison_tool(state: AgentState, google_api_key: str, groq_api_key: str):
     response = comparison_and_evaluation_tool(state['query'], google_api_key, groq_api_key)
@@ -141,7 +141,7 @@ def call_image_tool(state: AgentState, google_api_key: str, pollinations_token: 
     return {"final_response": response}
 
 def router(state: AgentState, google_api_key: str):
-    """The brain of the agent. Decides which tool to use."""
+    """The brain of the agent. Decides which tool to use and updates the 'route' state key."""
     print("---AGENT: Routing query---")
     router_llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=google_api_key)
     query = state['query']
@@ -158,16 +158,17 @@ def router(state: AgentState, google_api_key: str):
     
     if "image_generation_tool" in response:
         print("---AGENT: Decision -> Image Generation Tool---")
-        return "image_generator"
+        # Return a valid state update dictionary
+        return {"route": "image_generator"}
     else:
         print("---AGENT: Decision -> Comparison & Evaluation Tool---")
-        return "comparison_chat"
+        # Return a valid state update dictionary
+        return {"route": "comparison_chat"}
 
 # --- Define the Agentic Graph ---
 def build_agent(google_api_key: str, groq_api_key: str, pollinations_token: str):
     workflow = StateGraph(AgentState)
 
-    # Use functools.partial to pass the API keys to the node functions
     router_with_keys = partial(router, google_api_key=google_api_key)
     comparison_node = partial(call_comparison_tool, google_api_key=google_api_key, groq_api_key=groq_api_key)
     image_node = partial(call_image_tool, google_api_key=google_api_key, pollinations_token=pollinations_token)
@@ -177,11 +178,14 @@ def build_agent(google_api_key: str, groq_api_key: str, pollinations_token: str)
     workflow.add_node("image_generator", image_node)
 
     workflow.set_entry_point("router")
+    
+    # The conditional edge function now simply reads the 'route' from the state
     workflow.add_conditional_edges(
         "router",
-        router_with_keys,
+        lambda state: state["route"],
         {"comparison_chat": "comparison_chat", "image_generator": "image_generator"}
     )
+    
     workflow.add_edge("comparison_chat", END)
     workflow.add_edge("image_generator", END)
 
