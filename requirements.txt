@@ -18,3 +18,4 @@ Pillow
 pymupdf
 concurrent-log-handler
 feedparser
+langgraph
