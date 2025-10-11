@@ -9,6 +9,7 @@ from langchain.schema import HumanMessage
 from langgraph.graph import StateGraph, END
 import concurrent.futures
 from functools import partial
+from tavily import TavilyClient
 
 # =======================================================================================
 # TOOL 1: THE COMPARISON & EVALUATION WORKFLOW
@@ -127,6 +128,46 @@ def file_analysis_tool(question: str, file_content_as_text: str, google_api_key:
 # THE AGENT: A "WORKSHOP MANAGER" THAT CHOOSES THE RIGHT TOOL
 # ===================================================================
 
+# ===================================================================
+# NEW TOOL 3: WEB SEARCH & REAL-TIME DATA ANALYSIS
+# ===================================================================
+def web_search_tool(query: str, tavily_api_key: str, google_api_key: str) -> str:
+    """
+    Use this tool to get real-time information, answer questions about current events,
+    or for any query that requires up-to-date knowledge from the internet.
+    """
+    print("---TOOL: Executing Web Search and Analysis---")
+    try:
+        tavily = TavilyClient(api_key=tavily_api_key)
+        # Perform a search and get the most relevant results
+        search_results = tavily.search(query=query, search_depth="advanced", max_results=5)
+        
+        # Extract the content from the search results
+        search_content = "\n".join([result["content"] for result in search_results["results"]])
+        
+        # Use a powerful LLM to analyze the search results and answer the user's query
+        analyzer_llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=google_api_key)
+        analysis_prompt = f"""
+        You are an expert research analyst. You have been given a user's query and the results from a web search.
+        Your task is to provide a clear, concise, and comprehensive answer to the user's query based *only* on the provided search results.
+        Cite your sources using the information available in the search results if possible.
+
+        ### User Query:
+        {query}
+
+        ### Web Search Results:
+        ---
+        {search_content}
+        ---
+
+        Your Answer:
+        """
+        final_answer = analyzer_llm.invoke(analysis_prompt).content
+        return final_answer
+        
+    except Exception as e:
+        return f"⚠️ Web search failed: {e}"
+    
 class AgentState(TypedDict):
     query: str
     route: str  # Add this key to store the router's decision
