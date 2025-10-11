@@ -17,9 +17,9 @@ from functools import partial
 def choose_groq_model(prompt: str):
     p = prompt.lower()
     if any(x in p for x in ["python", "code", "algorithm", "bug", "function", "script"]):
-        return "llama3-70b-8192"
+        return "openai/gpt-oss-20b"
     else:
-        return "llama3-8b-8192"
+        return "llama-3.1-8b-instant"
 
 def query_groq(prompt: str, groq_api_key: str):
     model = choose_groq_model(prompt)
