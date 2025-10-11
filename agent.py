@@ -180,6 +180,9 @@ def call_comparison_tool(state: AgentState, google_api_key: str, groq_api_key: s
 def call_image_tool(state: AgentState, google_api_key: str, pollinations_token: str):
     response = image_generation_tool(state['query'], google_api_key, pollinations_token)
     return {"final_response": response}
+def call_web_search_tool(state: AgentState, tavily_api_key: str, google_api_key: str):
+    response = web_search_tool(state['query'], tavily_api_key, google_api_key)
+    return {"final_response": response}
 
 def router(state: AgentState, google_api_key: str):
     """The brain of the agent. Decides which tool to use and updates the 'route' state key."""
@@ -214,12 +217,6 @@ def build_agent(google_api_key: str, groq_api_key: str, pollinations_token: str 
     comparison_node = partial(call_comparison_tool, google_api_key=google_api_key, groq_api_key=groq_api_key)
     image_node = partial(call_image_tool, google_api_key=google_api_key, pollinations_token=pollinations_token)
     web_search_node = partial(call_web_search_tool, tavily_api_key=tavily_api_key, google_api_key=google_api_key)
-# Wrapper for web_search_tool to match the node interface
-def call_web_search_tool(state: AgentState, tavily_api_key: str, google_api_key: str):
-    response = web_search_tool(state['query'], tavily_api_key, google_api_key)
-    return {"final_response": response}
-
-
 
     workflow.add_node("router", router_with_keys)
     workflow.add_node("comparison_chat", comparison_node)
