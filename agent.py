@@ -217,6 +217,7 @@ def build_agent(google_api_key: str, groq_api_key: str, pollinations_token: str)
     workflow.add_node("router", router_with_keys)
     workflow.add_node("comparison_chat", comparison_node)
     workflow.add_node("image_generator", image_node)
+    workflow.add_node("web_search", web_search_node)
 
     workflow.set_entry_point("router")
     
@@ -224,10 +225,10 @@ def build_agent(google_api_key: str, groq_api_key: str, pollinations_token: str)
     workflow.add_conditional_edges(
         "router",
         lambda state: state["route"],
-        {"comparison_chat": "comparison_chat", "image_generator": "image_generator"}
+        {"comparison_chat": "comparison_chat", "image_generator": "image_generator" , "web_search": "web_search"}
     )
     
     workflow.add_edge("comparison_chat", END)
     workflow.add_edge("image_generator", END)
-
+    workflow.add_edge("web_search", END)
     return workflow.compile()

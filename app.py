@@ -19,6 +19,7 @@ try:
     google_api_key = st.secrets["GOOGLE_API_KEY"]
     pollinations_token = st.secrets["POLLINATIONS_TOKEN"]
     groq_api_key = st.secrets["GROQ_API_KEY"]
+    tavily_api_key = st.secrets["TAVILY_API_KEY"] 
 except KeyError as e:
     st.error(f"❌ Missing Secret: {e}. Please add it to your Streamlit Secrets.")
     st.stop()
@@ -100,7 +101,7 @@ if prompt := st.chat_input("Ask me to analyze text, create an image, or query a 
             # --- PATH 2: GENERAL PURPOSE AGENT (NO FILE) ---
             with st.spinner("Agent is deciding which tool to use..."):
                 # Build the agent, passing the keys from st.secrets
-                agent = build_agent(google_api_key, groq_api_key, pollinations_token)
+                agent = build_agent(google_api_key, groq_api_key, pollinations_token , tavily_api_key)
                 result = agent.invoke({"query": prompt})
                 final_response = result.get("final_response", {})
 
