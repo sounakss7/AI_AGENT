@@ -200,15 +200,15 @@ def router(state: AgentState, google_api_key: str):
     """
     response = router_llm.invoke(router_prompt).content.strip()
     
-    if "image_generation_tool" in response:
+    if "web_search_tool" in response:
+        print("---AGENT: Decision -> Web Search Tool---")
+        return {"route": "web_search"}
+    elif "image_generation_tool" in response:
         print("---AGENT: Decision -> Image Generation Tool---")
-        # Return a valid state update dictionary
         return {"route": "image_generator"}
     else:
         print("---AGENT: Decision -> Comparison & Evaluation Tool---")
-        # Return a valid state update dictionary
         return {"route": "comparison_chat"}
-
 # --- Define the Agentic Graph ---
 def build_agent(google_api_key: str, groq_api_key: str, pollinations_token: str , tavily_api_key: str ):
     workflow = StateGraph(AgentState)
