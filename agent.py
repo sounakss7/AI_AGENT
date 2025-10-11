@@ -90,7 +90,7 @@ def image_generation_tool(prompt: str, google_api_key: str, pollinations_token: 
     """Use this tool when the user asks to create, draw, or generate an image."""
     print("---TOOL: Generating Image---")
     try:
-        enhancer_llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=google_api_key)
+        enhancer_llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=google_api_key)
         enhancer_prompt = f"Rewrite this short prompt into a detailed, vibrant, and artistic image generation description: {prompt}"
         final_prompt = enhancer_llm.invoke(enhancer_prompt).content.strip()
         
@@ -109,7 +109,7 @@ def image_generation_tool(prompt: str, google_api_key: str, pollinations_token: 
 def file_analysis_tool(question: str, file_content_as_text: str, google_api_key: str):
     """Use this tool when the user has uploaded a file and is asking a question about it."""
     print("---TOOL: Analyzing File Content---")
-    streaming_llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=google_api_key, streaming=True)
+    streaming_llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=google_api_key, streaming=True)
     prompt = f"""
     You are an expert file analyst. Answer the user's question based ONLY on the provided file content.
 
@@ -143,7 +143,7 @@ def call_image_tool(state: AgentState, google_api_key: str, pollinations_token: 
 def router(state: AgentState, google_api_key: str):
     """The brain of the agent. Decides which tool to use."""
     print("---AGENT: Routing query---")
-    router_llm = ChatGoogleGenerativeAI(model="gemini-1.5-pro-latest", google_api_key=google_api_key)
+    router_llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=google_api_key)
     query = state['query']
     
     router_prompt = f"""
