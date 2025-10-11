@@ -194,9 +194,10 @@ def router(state: AgentState, google_api_key: str):
     You are a master routing agent. Determine the user's primary intent and select the appropriate tool. You have two choices:
     1.  `comparison_tool`: Use for complex questions, coding problems, analysis, or any text-based query needing a detailed, evaluated answer.
     2.  `image_generation_tool`: Use ONLY if the user explicitly asks to create, draw, or generate an image.
+    3.  `web_search_tool`: Use this for any query that requires real-time, up-to-date information. This includes questions about current events, news, weather, recent scientific discoveries, or topics created after 2023.
 
     User Query: "{query}"
-    Return ONLY the tool name (`comparison_tool` or `image_generation_tool`).
+    Return ONLY the tool name (`comparison_tool` or `image_generation_tool` or `web_search_tool`).
     """
     response = router_llm.invoke(router_prompt).content.strip()
     
