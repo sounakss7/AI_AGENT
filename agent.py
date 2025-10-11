@@ -207,12 +207,15 @@ def router(state: AgentState, google_api_key: str):
         return {"route": "comparison_chat"}
 
 # --- Define the Agentic Graph ---
-def build_agent(google_api_key: str, groq_api_key: str, pollinations_token: str):
+def build_agent(google_api_key: str, groq_api_key: str, pollinations_token: str , tavily_api_key: str ):
     workflow = StateGraph(AgentState)
 
     router_with_keys = partial(router, google_api_key=google_api_key)
     comparison_node = partial(call_comparison_tool, google_api_key=google_api_key, groq_api_key=groq_api_key)
     image_node = partial(call_image_tool, google_api_key=google_api_key, pollinations_token=pollinations_token)
+    web_search_node = partial(call_web_search_tool, tavily_api_key=tavily_api_key, google_api_key=google_api_key)
+
+
 
     workflow.add_node("router", router_with_keys)
     workflow.add_node("comparison_chat", comparison_node)
