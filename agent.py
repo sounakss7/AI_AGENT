@@ -108,19 +108,34 @@ def image_generation_tool(prompt: str, google_api_key: str, pollinations_token: 
 # ===================================================================
 
 def file_analysis_tool(question: str, file_content_as_text: str, google_api_key: str):
-    """Use this tool when the user has uploaded a file and is asking a question about it."""
-    print("---TOOL: Analyzing File Content---")
-    streaming_llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=google_api_key, streaming=True)
+    """
+    Use this tool when the user has uploaded a file and is asking a question about it.
+    This tool is now empowered to use its own expertise to provide a comprehensive analysis.
+    """
+    print("---TOOL: Executing Empowered File Analysis---")
+    # Using a more powerful model for high-quality analysis and evaluation
+    streaming_llm = ChatGoogleGenerativeAI(model="gemini-1.5-pro", google_api_key=google_api_key, streaming=True) 
+    
+    # This new, "freer" prompt gives the agent permission to be a true expert.
     prompt = f"""
-    You are an expert file analyst. Answer the user's question based ONLY on the provided file content.
+    **Your Persona:** You are a highly intelligent AI assistant and a multi-disciplinary expert. Your goal is to provide the most helpful and insightful analysis possible, combining the provided file content with your own vast knowledge.
 
-    ### User's Question:
+    **The Task:** A user has uploaded a file and asked a question. Use the file content as the primary source of truth and context, but you are encouraged to enrich your answer with your own expertise, especially when asked for an evaluation, opinion, or a subjective score.
+
+    **How to Behave Based on File Content:**
+    * **If the file appears to be CODE (e.g., Python, JavaScript, etc.):** Act as a senior software engineer. Analyze its structure, logic, efficiency, and style. If the user asks for a score or review, provide a thoughtful evaluation with justifications and suggestions for improvement.
+    * **If the file appears to be TEXT (e.g., an article, report, essay):** Act as a research analyst. Summarize key points, extract specific information, and answer the user's questions. You can add relevant context from your own knowledge if it enhances the answer (e.g., providing historical context for an article).
+    * **For all other file types:** Do your best to interpret the text content and provide a helpful, intelligent response to the user's question.
+
+    **User's Question:**
     {question}
-    ### File Content:
+
+    **Provided File Content:**
     ---
-    {file_content_as_text[:30000]} 
+    {file_content_as_text[:40000]} 
     ---
-    Your analysis:
+
+    **Your Comprehensive Analysis:**
     """
     return streaming_llm.stream([HumanMessage(content=prompt)])
 
