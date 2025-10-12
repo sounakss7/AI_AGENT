@@ -107,17 +107,20 @@ if prompt := st.chat_input("Ask about the latest news, create an image, or query
                     st.session_state.messages.append({"role": "assistant", "text": final_response})
 
                 # --- NEW FEATURE: Handle Image Response with Download Button ---
-                if isinstance(final_response, dict) and "image" in final_response:
+                elif isinstance(final_response, dict) and "image" in final_response:
                     img_data = final_response["image"]
                     caption = final_response.get("caption")
                     st.image(img_data, caption=caption)
+                    
                     # Convert PIL Image to bytes for downloading
                     buf = BytesIO()
                     img_data.save(buf, format="PNG")
                     byte_im = buf.getvalue()
+
                     # Create a safe filename from the prompt
                     safe_prompt = re.sub(r'[^a-zA-Z0-9\s]', '', prompt).strip().replace(' ', '_')
                     file_name = f"{safe_prompt[:50]}.png"
+
                     st.download_button(
                         label="📥 Download Image",
                         data=byte_im,
