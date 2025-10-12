@@ -5,7 +5,7 @@ from PyPDF2 import PdfReader
 import fitz
 import pytesseract
 from datetime import datetime
-import re # Import re for filename sanitization
+import re  # Import re for filename sanitization
 
 # Import the agent logic from our new file
 from agent import build_agent, file_analysis_tool
@@ -42,24 +42,32 @@ for message in st.session_state.messages:
             st.markdown(message["text"])
         if "image" in message and message["image"]:
             st.image(message["image"], caption=message.get("caption"))
-            # Note: The download button won't persist in the history view for simplicity.
 
 # --- Sidebar for File Upload and Utilities ---
 with st.sidebar:
     st.header("📂 File Analysis")
-    uploaded_file = st.file_uploader("Upload a file to ask questions about it", type=["pdf", "txt", "py", "js", "html", "css"])
+    uploaded_file = st.file_uploader(
+        "Upload a file to ask questions about it", 
+        type=["pdf", "txt", "py", "js", "html", "css"]
+    )
+
     st.header("🧭 Utilities")
     if st.button("Clear Chat History"):
         st.session_state.messages = []
         st.rerun()
+
     st.markdown("### 💡 AI Tip of the Day")
     st.info("You can now download generated images and copy text responses directly from the chat!")
+
     st.markdown("### 🕒 Current Time")
     st.write(datetime.now().strftime("%d %B %Y, %I:%M:%S %p"))
 
 # --- Main Chat Input Logic ---
-if prompt := st.chat_input("Ask about the latest news, create an image, or query a file..."):
+prompt = st.chat_input("Ask about the latest news, create an image, or query a file...")
+
+if prompt:
     st.session_state.messages.append({"role": "user", "text": prompt})
+
     with st.chat_message("user"):
         st.markdown(prompt)
 
@@ -67,13 +75,17 @@ if prompt := st.chat_input("Ask about the latest news, create an image, or query
         # --- AGENTIC WORKFLOW STARTS HERE ---
         if uploaded_file:
             with st.spinner(f"Reading and analyzing `{uploaded_file.name}`..."):
-                # (File analysis logic is unchanged)
                 try:
                     file_bytes = uploaded_file.read()
                     file_text = ""
-                    if "pdf" in uploaded_file.type:
+
+                    # PDF Handling
+                    if uploaded_file.type == "application/pdf":
                         reader = PdfReader(BytesIO(file_bytes))
-                        for page in reader.pages: file_text += page.extract_text() or ""
+                        for page in reader.pages:
+                            text = page.extract_text()
+                            if text:
+                                file_text += text
                         if not file_text.strip():
                             st.info("No text layer found, performing OCR...")
                             doc = fitz.open(stream=file_bytes, filetype="pdf")
@@ -82,6 +94,7 @@ if prompt := st.chat_input("Ask about the latest news, create an image, or query
                                 img = Image.open(BytesIO(pix.tobytes("png")))
                                 file_text += pytesseract.image_to_string(img)
                     else:
+                        # Other text/code files
                         file_text = file_bytes.decode("utf-8", errors="ignore")
 
                     if not file_text.strip():
@@ -89,8 +102,8 @@ if prompt := st.chat_input("Ask about the latest news, create an image, or query
                     else:
                         response_stream = file_analysis_tool(prompt, file_text, google_api_key)
                         full_response = st.write_stream(response_stream)
-                        # We store the markdown version for cleaner history display
                         st.session_state.messages.append({"role": "assistant", "text": full_response})
+
                 except Exception as e:
                     st.error(f"Error processing file: {e}")
                     st.session_state.messages.append({"role": "assistant", "text": f"Error: {e}"})
@@ -100,24 +113,23 @@ if prompt := st.chat_input("Ask about the latest news, create an image, or query
                 result = agent.invoke({"query": prompt})
                 final_response = result.get("final_response", {})
 
-                # --- NEW FEATURE: Handle Text Response with Copy Button ---
+                # --- Handle Text Response with Copy Button ---
                 if isinstance(final_response, str):
-                    # Use st.code to display the text, which includes a copy button
                     st.code(final_response, language=None)
                     st.session_state.messages.append({"role": "assistant", "text": final_response})
 
-                # --- NEW FEATURE: Handle Image Response with Download Button ---
+                # --- Handle Image Response with Download Button ---
                 elif isinstance(final_response, dict) and "image" in final_response:
                     img_data = final_response["image"]
                     caption = final_response.get("caption")
                     st.image(img_data, caption=caption)
-                    
+
                     # Convert PIL Image to bytes for downloading
                     buf = BytesIO()
                     img_data.save(buf, format="PNG")
                     byte_im = buf.getvalue()
 
-                    # Create a safe filename from the prompt
+                    # Sanitize filename
                     safe_prompt = re.sub(r'[^a-zA-Z0-9\s]', '', prompt).strip().replace(' ', '_')
                     file_name = f"{safe_prompt[:50]}.png"
 
@@ -127,12 +139,18 @@ if prompt := st.chat_input("Ask about the latest news, create an image, or query
                         file_name=file_name,
                         mime="image/png"
                     )
-                    st.session_state.messages.append({"role": "assistant", "image": img_data, "caption": caption})
-                    
-                else: # Handle errors
+
+                    st.session_state.messages.append({
+                        "role": "assistant",
+                        "image": img_data,
+                        "caption": caption
+                    })
+
+                else:
+                    # Handle error or unexpected response
                     error_message = final_response.get("error", "Sorry, something went wrong.")
                     st.error(error_message)
                     st.session_state.messages.append({"role": "assistant", "text": f"Error: {error_message}"})
-    
-    # Rerun to clear the file uploader widget and sync state
+
+    # ✅ Must rerun after message handling to refresh UI cleanly
     st.rerun()
