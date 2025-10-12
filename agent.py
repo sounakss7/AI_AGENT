@@ -114,7 +114,7 @@ def file_analysis_tool(question: str, file_content_as_text: str, google_api_key:
     """
     print("---TOOL: Executing Empowered File Analysis---")
     # Using a more powerful model for high-quality analysis and evaluation
-    streaming_llm = ChatGoogleGenerativeAI(model="gemini-1.5-pro", google_api_key=google_api_key, streaming=True) 
+    streaming_llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=google_api_key, streaming=True) 
     
     # This new, "freer" prompt gives the agent permission to be a true expert.
     prompt = f"""
