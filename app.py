@@ -93,9 +93,9 @@ with st.sidebar:
 
         # Updated data for Llama-3.1-8B Instant vs. Gemini-2.5 Flash
         benchmark_data = {
-            "MMLU": {"Llama-3.1-8B Instant": 74.2, "Gemini 2.5 Flash": 82.1, "help": "Measures general knowledge and problem-solving."},
-            "HumanEval": {"Llama-3.1-8B Instant": 70.3, "Gemini 2.5 Flash": 83.5, "help": "Measures Python code generation ability."},
-            "GSM8K": {"Llama-3.1-8B Instant": 84.2, "Gemini 2.5 Flash": 91.1, "help": "Measures grade-school math reasoning."}
+            "MMLU": {"Llama-3.1-8B Instant": 74.2, "Gemini-2.5 Flash": 82.1, "help": "Measures general knowledge and problem-solving."},
+            "HumanEval": {"Llama-3.1-8B Instant": 70.3, "Gemini-2.5 Flash": 83.5, "help": "Measures Python code generation ability."},
+            "GSM8K": {"Llama-3.1-8B Instant": 84.2, "Gemini-2.5 Flash": 91.1, "help": "Measures grade-school math reasoning."}
         }
         
         for bench, scores in benchmark_data.items():
