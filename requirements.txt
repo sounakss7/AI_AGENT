@@ -20,3 +20,4 @@ concurrent-log-handler
 feedparser
 langgraph
 tavily-python
+pandas
