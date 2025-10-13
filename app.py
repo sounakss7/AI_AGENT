@@ -8,6 +8,8 @@ from datetime import datetime
 import re
 import time
 import pandas as pd
+import random  # <-- NEW: Import for AI Tip of the Day
+from urllib.parse import quote_plus  # <-- NEW: Import for Google Search URL encoding
 
 # Import the agent logic
 from agent import build_agent, file_analysis_tool
@@ -49,47 +51,70 @@ st.title("🧠 AI Agent Workshop")
 st.write("I can search the web, create images, analyze documents, and more!")
 
 # =======================================================
-# Sidebar with Dynamic Insights Dashboard
+# Sidebar with All Features
 # =======================================================
 with st.sidebar:
+    ### NEW: GOOGLE SEARCH WIDGET ###
+    st.header("🔍 Google Search")
+    search_query = st.text_input("Search the web directly...", key="google_search")
+    if st.button("Search"):
+        if search_query:
+            encoded_query = quote_plus(search_query)
+            search_url = f"https://www.google.com/search?q={encoded_query}"
+            st.markdown(f'<a href="{search_url}" target="_blank">Open Google search results for "{search_query}"</a>', unsafe_allow_html=True)
+        else:
+            st.warning("Please enter a search query.")
+
     st.header("📂 File Analysis")
     uploaded_file = st.file_uploader("Upload a file to ask questions about it", type=["pdf", "txt", "py", "js", "html", "css"])
     
     st.header("🧭 Utilities")
     if st.button("Clear Chat History & Reset Metrics"):
         st.session_state.messages = []
-        # Reset metrics as well
         st.session_state.metrics = {
             "total_requests": 0, "tool_usage": {"Comparison": 0, "Image Gen": 0, "Web Search": 0, "File Analysis": 0},
             "total_latency": 0.0, "average_latency": 0.0, "accuracy_feedback": {"👍": 0, "👎": 0}, "last_query_details": {}
         }
         st.rerun()
 
+    ### NEW: AI TIP OF THE DAY ###
+    st.markdown("### 💡 AI Tip of the Day")
+    ai_tips = [
+        "Ask the agent about current events to see the Web Search tool in action!",
+        "Try asking the agent to 'draw a picture of...' to test its image generation.",
+        "Upload a Python file and ask the agent to 'give this code a score out of 10' to test file analysis.",
+        "Complex questions like 'compare Python and JavaScript' will trigger the detailed Comparison tool.",
+    ]
+    st.info(random.choice(ai_tips))
+    
+    ### NEW: LIVE CLOCK ###
+    st.markdown("### 🕒 Live Server Time")
+    st.info(datetime.now().strftime("%d %B %Y, %I:%M:%S %p"))
+
+
     st.header("📊 Data & Insights")
     metrics = st.session_state.metrics
-    
+    # (The rest of the dashboard code is unchanged)
     col1, col2 = st.columns(2)
     col1.metric("Total Requests", metrics["total_requests"])
     col2.metric("Avg. Latency", f"{metrics['average_latency']:.2f} s")
-
     st.subheader("Tool Usage")
     if metrics["total_requests"] > 0:
         tool_df = pd.DataFrame(list(metrics["tool_usage"].items()), columns=['Tool', 'Count'])
         st.bar_chart(tool_df.set_index('Tool'))
     else:
         st.info("No queries yet.")
-
     st.subheader("User Feedback (Accuracy)")
     if (metrics["accuracy_feedback"]["👍"] + metrics["accuracy_feedback"]["👎"]) > 0:
         feedback_df = pd.DataFrame(list(metrics["accuracy_feedback"].items()), columns=['Feedback', 'Count'])
         st.bar_chart(feedback_df.set_index('Feedback'))
     else:
         st.info("No feedback yet.")
-
     with st.expander("🕵️ See Last Query Details"):
         st.json(metrics["last_query_details"])
 
-# Display previous messages from history
+# (The main chat history and input logic below remains the same as the previous version)
+# ... The rest of your app.py file ...
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         if "text" in message:
@@ -98,21 +123,32 @@ for message in st.session_state.messages:
             img = Image.open(BytesIO(message["image_bytes"]))
             st.image(img, caption=message.get("caption"))
 
-# --- Main Chat Input Logic ---
 if prompt := st.chat_input("Ask about the latest news, create an image, or query a file..."):
     st.session_state.messages.append({"role": "user", "text": prompt})
     
     with st.chat_message("assistant"):
         with st.spinner("Agent is working..."):
-            # Start timer
             start_time = time.time()
-            tool_used_key = "" # To store which tool was used
+            tool_used_key = ""
             
             if uploaded_file:
                 tool_used_key = "File Analysis"
                 file_bytes = uploaded_file.read()
-                file_text = "File content placeholder" # Simplified
-                # ... (your file reading logic would be here) ...
+                file_text = ""
+                # Your file reading logic here...
+                if "pdf" in uploaded_file.type:
+                    reader = PdfReader(BytesIO(file_bytes))
+                    for page in reader.pages: file_text += page.extract_text() or ""
+                    if not file_text.strip():
+                        st.info("No text layer found, performing OCR...")
+                        doc = fitz.open(stream=file_bytes, filetype="pdf")
+                        for page in doc:
+                            pix = page.get_pixmap()
+                            img = Image.open(BytesIO(pix.tobytes("png")))
+                            file_text += pytesseract.image_to_string(img)
+                else:
+                    file_text = file_bytes.decode("utf-8", errors="ignore")
+                
                 response_stream = file_analysis_tool(prompt, file_text, google_api_key)
                 full_response = st.write_stream(response_stream)
                 st.session_state.messages.append({"role": "assistant", "text": full_response})
@@ -122,7 +158,6 @@ if prompt := st.chat_input("Ask about the latest news, create an image, or query
                 result = agent.invoke({"query": prompt})
                 final_response = result.get("final_response", {})
                 
-                # Determine which tool was used from the route
                 route = result.get("route", "comparison_chat")
                 if route == "comparison_chat": tool_used_key = "Comparison"
                 elif route == "image_generator": tool_used_key = "Image Gen"
@@ -143,11 +178,9 @@ if prompt := st.chat_input("Ask about the latest news, create an image, or query
                     error_message = final_response.get("error", "Sorry, something went wrong.")
                     st.session_state.messages.append({"role": "assistant", "text": f"Error: {error_message}"})
             
-            # End timer and calculate latency
             end_time = time.time()
             latency = end_time - start_time
             
-            # Update Metrics in Session State
             metrics = st.session_state.metrics
             metrics["total_requests"] += 1
             if tool_used_key:
@@ -161,10 +194,8 @@ if prompt := st.chat_input("Ask about the latest news, create an image, or query
                 "latency_seconds": round(latency, 2)
             }
     
-    # Rerun to update the entire UI, including the dashboard
     st.rerun()
 
-# Add Feedback Buttons to the last assistant message
 if st.session_state.messages and st.session_state.messages[-1]["role"] == "assistant":
     message_id = len(st.session_state.messages) - 1
 
