@@ -78,33 +78,33 @@ with st.sidebar:
 
     st.markdown("### 💡 AI Tip of the Day")
     st.info(random.choice([
+        "The Comparison tool uses both Gemini 1.5 Flash and Llama 3.1 8B for a robust answer.",
         "Ask about current events to see the Web Search tool in action!",
-        "Upload a Python file and ask for a score to test File Analysis.",
-        "Complex questions trigger the detailed Comparison tool."
+        "Upload a Python file and ask for a score to test File Analysis."
     ]))
     
     st.markdown("### 🕒 Live Server Time")
     st.info(datetime.now().strftime("%d %B %Y, %I:%M:%S %p"))
 
-    ### NEW SECTION: MODEL BENCHMARKS ###
+    ### THIS SECTION HAS BEEN UPDATED ###
     st.header("🤖 Model Benchmarks")
     with st.expander("See Industry Benchmark Scores"):
-        st.markdown("**Note:** These are representative scores from public benchmarks and are not run live.")
+        st.markdown("**Note:** These are public scores for the models used in this agent's Comparison tool.")
         
-        # Data for benchmarks - in a real app, this might come from a file or API
+        # Updated data for Llama 3.1 8B vs. Gemini 1.5 Flash
         benchmark_data = {
-            "MMLU": {"Gemini 2.5 Flash": 78.9, "Llama 3 70B": 82.0, "help": "Measures general knowledge and problem-solving."},
-            "HumanEval": {"Gemini 2.5 Flash": 74.4, "Llama 3 70B": 81.7, "help": "Measures Python code generation ability."},
-            "GSM8K": {"Gemini 2.5 Flash": 91.1, "Llama 3 70B": 94.1, "help": "Measures grade-school math reasoning."}
+            "MMLU": {"Llama 3.1 8B": 79.5, "Gemini 1.5 Flash": 78.9, "help": "Measures general knowledge and problem-solving."},
+            "HumanEval": {"Llama 3.1 8B": 82.2, "Gemini 1.5 Flash": 74.4, "help": "Measures Python code generation ability."},
+            "GSM8K": {"Llama 3.1 8B": 92.2, "Gemini 1.5 Flash": 91.1, "help": "Measures grade-school math reasoning."}
         }
         
         for bench, scores in benchmark_data.items():
-            g_score = scores["Gemini 2.5 Flash"]
-            l_score = scores["Llama 3 70B"]
+            llama_score = scores["Llama 3.1 8B"]
+            flash_score = scores["Gemini 1.5 Flash"]
             st.markdown(f"**{bench}**")
             c1, c2 = st.columns(2)
-            c1.metric("Gemini 2.5 Flash", f"{g_score}%", delta=f"{round(g_score - l_score, 1)}%", help=scores["help"])
-            c2.metric("Llama 3 70B (Groq)", f"{l_score}%", delta=f"{round(l_score - g_score, 1)}%", help=scores["help"])
+            c1.metric("Llama 3.1 8B (Groq)", f"{llama_score}%", delta=f"{round(llama_score - flash_score, 1)}%", help=scores["help"])
+            c2.metric("Gemini 1.5 Flash", f"{flash_score}%", delta=f"{round(flash_score - llama_score, 1)}%", help=scores["help"])
 
     st.header("📊 Live Agent Performance")
     metrics = st.session_state.metrics
@@ -113,7 +113,6 @@ with st.sidebar:
     col1.metric("Total Requests", metrics["total_requests"])
     col2.metric("Avg. Latency", f"{metrics['average_latency']:.2f} s")
     
-    ### NEW: LIVE ACCURACY METRIC ###
     st.subheader("📈 Live App Accuracy (User Feedback)")
     total_feedback = metrics["accuracy_feedback"]["👍"] + metrics["accuracy_feedback"]["👎"]
     if total_feedback > 0:
@@ -131,7 +130,6 @@ with st.sidebar:
         st.json(metrics["last_query_details"])
 
 # (The main chat history and input logic below remains the same)
-# ... The rest of your app.py file ...
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         if "text" in message:
