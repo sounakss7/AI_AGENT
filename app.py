@@ -88,45 +88,23 @@ with st.sidebar:
 
     ### THIS SECTION HAS BEEN UPDATED ###
     st.header("🤖 Model Benchmarks")
-with st.expander("See Industry Benchmark Scores"):
-    st.markdown("**Note:** These are approximate public and community-sourced scores for the models used in this agent's Comparison tool.")
-    
-    # ✅ Updated benchmark data for Llama 3.1 8B Instant vs Gemini 2.5 Flash
-    benchmark_data = {
-        "MMLU": {
-            "Llama 3.1 8B Instant": 74.0,
-            "Gemini 2.5 Flash": 80.0,
-            "help": "Measures general knowledge and problem-solving across multiple domains."
-        },
-        "HumanEval": {
-            "Llama 3.1 8B Instant": 70.0,
-            "Gemini 2.5 Flash": 80.0,
-            "help": "Evaluates Python code generation and functional correctness (pass@1)."
-        },
-        "GSM8K": {
-            "Llama 3.1 8B Instant": 84.0,
-            "Gemini 2.5 Flash": 88.0,
-            "help": "Tests grade-school math reasoning ability."
+    with st.expander("See Industry Benchmark Scores"):
+        st.markdown("**Note:** These are public scores for the models used in this agent's Comparison tool.")
+        
+        # Updated data for Llama 3.1 8B vs. Gemini 1.5 Flash
+        benchmark_data = {
+            "MMLU": {"Llama 3.1 8B": 79.5, "Gemini 1.5 Flash": 78.9, "help": "Measures general knowledge and problem-solving."},
+            "HumanEval": {"Llama 3.1 8B": 82.2, "Gemini 1.5 Flash": 74.4, "help": "Measures Python code generation ability."},
+            "GSM8K": {"Llama 3.1 8B": 92.2, "Gemini 1.5 Flash": 91.1, "help": "Measures grade-school math reasoning."}
         }
-    }
-
-    for bench, scores in benchmark_data.items():
-        llama_score = scores["Llama 3.1 8B Instant"]
-        flash_score = scores["Gemini 2.5 Flash"]
-        st.markdown(f"**{bench}**")
-        c1, c2 = st.columns(2)
-        c1.metric(
-            "Llama 3.1 8B Instant (Groq)",
-            f"{llama_score}%",
-            delta=f"{round(llama_score - flash_score, 1)}%",
-            help=scores["help"]
-        )
-        c2.metric(
-            "Gemini 2.5 Flash",
-            f"{flash_score}%",
-            delta=f"{round(flash_score - llama_score, 1)}%",
-            help=scores["help"]
-        )
+        
+        for bench, scores in benchmark_data.items():
+            llama_score = scores["Llama 3.1 8B"]
+            flash_score = scores["Gemini 1.5 Flash"]
+            st.markdown(f"**{bench}**")
+            c1, c2 = st.columns(2)
+            c1.metric("Llama 3.1 8B (Groq)", f"{llama_score}%", delta=f"{round(llama_score - flash_score, 1)}%", help=scores["help"])
+            c2.metric("Gemini 1.5 Flash", f"{flash_score}%", delta=f"{round(flash_score - llama_score, 1)}%", help=scores["help"])
 
     st.header("📊 Live Agent Performance")
     metrics = st.session_state.metrics
