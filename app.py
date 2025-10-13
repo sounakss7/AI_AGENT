@@ -8,8 +8,8 @@ from datetime import datetime
 import re
 import time
 import pandas as pd
-import random  # <-- NEW: Import for AI Tip of the Day
-from urllib.parse import quote_plus  # <-- NEW: Import for Google Search URL encoding
+import random
+from urllib.parse import quote_plus
 
 # Import the agent logic
 from agent import build_agent, file_analysis_tool
@@ -54,14 +54,13 @@ st.write("I can search the web, create images, analyze documents, and more!")
 # Sidebar with All Features
 # =======================================================
 with st.sidebar:
-    ### NEW: GOOGLE SEARCH WIDGET ###
     st.header("🔍 Google Search")
     search_query = st.text_input("Search the web directly...", key="google_search")
     if st.button("Search"):
         if search_query:
             encoded_query = quote_plus(search_query)
             search_url = f"https://www.google.com/search?q={encoded_query}"
-            st.markdown(f'<a href="{search_url}" target="_blank">Open Google search results for "{search_query}"</a>', unsafe_allow_html=True)
+            st.markdown(f'<a href="{search_url}" target="_blank">Open Google search results</a>', unsafe_allow_html=True)
         else:
             st.warning("Please enter a search query.")
 
@@ -77,43 +76,61 @@ with st.sidebar:
         }
         st.rerun()
 
-    ### NEW: AI TIP OF THE DAY ###
     st.markdown("### 💡 AI Tip of the Day")
-    ai_tips = [
-        "Ask the agent about current events to see the Web Search tool in action!",
-        "Try asking the agent to 'draw a picture of...' to test its image generation.",
-        "Upload a Python file and ask the agent to 'give this code a score out of 10' to test file analysis.",
-        "Complex questions like 'compare Python and JavaScript' will trigger the detailed Comparison tool.",
-    ]
-    st.info(random.choice(ai_tips))
+    st.info(random.choice([
+        "Ask about current events to see the Web Search tool in action!",
+        "Upload a Python file and ask for a score to test File Analysis.",
+        "Complex questions trigger the detailed Comparison tool."
+    ]))
     
-    ### NEW: LIVE CLOCK ###
     st.markdown("### 🕒 Live Server Time")
     st.info(datetime.now().strftime("%d %B %Y, %I:%M:%S %p"))
 
+    ### NEW SECTION: MODEL BENCHMARKS ###
+    st.header("🤖 Model Benchmarks")
+    with st.expander("See Industry Benchmark Scores"):
+        st.markdown("**Note:** These are representative scores from public benchmarks and are not run live.")
+        
+        # Data for benchmarks - in a real app, this might come from a file or API
+        benchmark_data = {
+            "MMLU": {"Gemini 2.5 Flash": 78.9, "Llama 3 70B": 82.0, "help": "Measures general knowledge and problem-solving."},
+            "HumanEval": {"Gemini 2.5 Flash": 74.4, "Llama 3 70B": 81.7, "help": "Measures Python code generation ability."},
+            "GSM8K": {"Gemini 2.5 Flash": 91.1, "Llama 3 70B": 94.1, "help": "Measures grade-school math reasoning."}
+        }
+        
+        for bench, scores in benchmark_data.items():
+            g_score = scores["Gemini 2.5 Flash"]
+            l_score = scores["Llama 3 70B"]
+            st.markdown(f"**{bench}**")
+            c1, c2 = st.columns(2)
+            c1.metric("Gemini 2.5 Flash", f"{g_score}%", delta=f"{round(g_score - l_score, 1)}%", help=scores["help"])
+            c2.metric("Llama 3 70B (Groq)", f"{l_score}%", delta=f"{round(l_score - g_score, 1)}%", help=scores["help"])
 
-    st.header("📊 Data & Insights")
+    st.header("📊 Live Agent Performance")
     metrics = st.session_state.metrics
-    # (The rest of the dashboard code is unchanged)
+    
     col1, col2 = st.columns(2)
     col1.metric("Total Requests", metrics["total_requests"])
     col2.metric("Avg. Latency", f"{metrics['average_latency']:.2f} s")
-    st.subheader("Tool Usage")
+    
+    ### NEW: LIVE ACCURACY METRIC ###
+    st.subheader("📈 Live App Accuracy (User Feedback)")
+    total_feedback = metrics["accuracy_feedback"]["👍"] + metrics["accuracy_feedback"]["👎"]
+    if total_feedback > 0:
+        positive_rate = (metrics["accuracy_feedback"]["👍"] / total_feedback) * 100
+        st.metric("Positive Feedback Rate", f"{positive_rate:.1f}%", help="Based on user 👍/👎 clicks.")
+    else:
+        st.info("No feedback yet to calculate accuracy.")
+
+    st.subheader("🛠️ Tool Usage")
     if metrics["total_requests"] > 0:
         tool_df = pd.DataFrame(list(metrics["tool_usage"].items()), columns=['Tool', 'Count'])
         st.bar_chart(tool_df.set_index('Tool'))
-    else:
-        st.info("No queries yet.")
-    st.subheader("User Feedback (Accuracy)")
-    if (metrics["accuracy_feedback"]["👍"] + metrics["accuracy_feedback"]["👎"]) > 0:
-        feedback_df = pd.DataFrame(list(metrics["accuracy_feedback"].items()), columns=['Feedback', 'Count'])
-        st.bar_chart(feedback_df.set_index('Feedback'))
-    else:
-        st.info("No feedback yet.")
+    
     with st.expander("🕵️ See Last Query Details"):
         st.json(metrics["last_query_details"])
 
-# (The main chat history and input logic below remains the same as the previous version)
+# (The main chat history and input logic below remains the same)
 # ... The rest of your app.py file ...
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
@@ -135,7 +152,6 @@ if prompt := st.chat_input("Ask about the latest news, create an image, or query
                 tool_used_key = "File Analysis"
                 file_bytes = uploaded_file.read()
                 file_text = ""
-                # Your file reading logic here...
                 if "pdf" in uploaded_file.type:
                     reader = PdfReader(BytesIO(file_bytes))
                     for page in reader.pages: file_text += page.extract_text() or ""
