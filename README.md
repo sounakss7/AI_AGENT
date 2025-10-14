@@ -89,3 +89,32 @@ langgraph
 tavily-python
 pip install -r requirements.txt
 ```
+### 5. Configure API Keys
+
+The application uses Streamlit Secrets for managing API keys.
+
+1.  Create a folder named `.streamlit` in your project's root directory.
+2.  Inside this folder, create a file named `secrets.toml`.
+3.  Add your API keys to this file in the following format:
+
+```toml
+# .streamlit/secrets.toml
+
+# Google Gemini API Key
+GOOGLE_API_KEY = "YOUR_GOOGLE_API_KEY_HERE"
+
+# Groq API Key
+GROQ_API_KEY = "YOUR_GROQ_API_KEY_HERE"
+
+# Tavily Search API Key
+TAVILY_API_KEY = "YOUR_TAVILY_API_KEY_HERE"
+
+# Pollinations.ai Token (Optional, can be used without one)
+POLLINATIONS_TOKEN = "YOUR_POLLINATIONS_TOKEN_HERE"
+```
+## ▶️ How to Run the Application
+
+Once you have completed the setup, run the following command in your terminal from the project's root directory:
+
+```bash
+streamlit run streamlit_app.py
