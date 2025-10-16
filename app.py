@@ -10,8 +10,9 @@ import time
 import pandas as pd
 import random
 from urllib.parse import quote_plus
+import asyncio  # --- NEW IMPORT ---
 
-# Import the agent logic
+# Import the agent logic (no changes needed in agent.py)
 from agent import build_agent, file_analysis_tool
 
 # =====================
@@ -34,6 +35,9 @@ except KeyError as e:
 # ===============================================
 if "messages" not in st.session_state:
     st.session_state.messages = []
+# --- NEW: Add a key to store the agent's trace ---
+if "trajectory" not in st.session_state:
+    st.session_state.trajectory = []
 if "metrics" not in st.session_state:
     st.session_state.metrics = {
         "total_requests": 0,
@@ -45,14 +49,11 @@ if "metrics" not in st.session_state:
     }
 
 # =====================
-# Main Application UI
+# Main Application UI & Sidebar (Unchanged)
 # =====================
 st.title("🧠 AI Agent Workshop")
 st.write("I can search the web, create images, analyze documents, and more!")
 
-# =======================================================
-# Sidebar with All Features
-# =======================================================
 with st.sidebar:
     st.header("🔍 Google Search")
     search_query = st.text_input("Search the web directly...", key="google_search")
@@ -70,6 +71,7 @@ with st.sidebar:
     st.header("🧭 Utilities")
     if st.button("Clear Chat History & Reset Metrics"):
         st.session_state.messages = []
+        st.session_state.trajectory = [] # --- ADDED: Clear trajectory on reset ---
         st.session_state.metrics = {
             "total_requests": 0, "tool_usage": {"Comparison": 0, "Image Gen": 0, "Web Search": 0, "File Analysis": 0},
             "total_latency": 0.0, "average_latency": 0.0, "accuracy_feedback": {"👍": 0, "👎": 0}, "last_query_details": {}
@@ -86,21 +88,16 @@ with st.sidebar:
     st.markdown("### 🕒 Live Server Time")
     st.info(datetime.now().strftime("%d %B %Y, %I:%M:%S %p"))
 
-    ### THIS SECTION HAS BEEN UPDATED ###
     st.header("🤖 Model Benchmarks")
     with st.expander("See Industry Benchmark Scores"):
         st.markdown("**Note:** These are public scores for the models used in this agent's Comparison tool.")
-
-        # Updated data for Llama-3.1-8B Instant vs. Gemini-2.5 Flash
         benchmark_data = {
             "MMLU": {"Llama-3.1-8B Instant": 74.2, "Gemini-2.5 Flash": 82.1, "help": "Measures general knowledge and problem-solving."},
             "HumanEval": {"Llama-3.1-8B Instant": 70.3, "Gemini-2.5 Flash": 83.5, "help": "Measures Python code generation ability."},
             "GSM8K": {"Llama-3.1-8B Instant": 84.2, "Gemini-2.5 Flash": 91.1, "help": "Measures grade-school math reasoning."}
         }
-        
         for bench, scores in benchmark_data.items():
-            llama_score = scores["Llama-3.1-8B Instant"]
-            flash_score = scores["Gemini-2.5 Flash"]
+            llama_score, flash_score = scores["Llama-3.1-8B Instant"], scores["Gemini-2.5 Flash"]
             st.markdown(f"**{bench}**")
             c1, c2 = st.columns(2)
             c1.metric("Llama-3.1-8B Instant (Groq)", f"{llama_score}%", delta=f"{round(llama_score - flash_score, 1)}%", help=scores["help"])
@@ -108,11 +105,9 @@ with st.sidebar:
 
     st.header("📊 Live Agent Performance")
     metrics = st.session_state.metrics
-    
     col1, col2 = st.columns(2)
     col1.metric("Total Requests", metrics["total_requests"])
     col2.metric("Avg. Latency", f"{metrics['average_latency']:.2f} s")
-    
     st.subheader("📈 Live App Accuracy (User Feedback)")
     total_feedback = metrics["accuracy_feedback"]["👍"] + metrics["accuracy_feedback"]["👎"]
     if total_feedback > 0:
@@ -120,16 +115,16 @@ with st.sidebar:
         st.metric("Positive Feedback Rate", f"{positive_rate:.1f}%", help="Based on user 👍/👎 clicks.")
     else:
         st.info("No feedback yet to calculate accuracy.")
-
     st.subheader("🛠️ Tool Usage")
     if metrics["total_requests"] > 0:
         tool_df = pd.DataFrame(list(metrics["tool_usage"].items()), columns=['Tool', 'Count'])
         st.bar_chart(tool_df.set_index('Tool'))
-    
     with st.expander("🕵️ See Last Query Details"):
         st.json(metrics["last_query_details"])
 
-# (The main chat history and input logic below remains the same)
+# ===============================================
+# Main Chat Display Logic (Unchanged)
+# ===============================================
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         if "text" in message:
@@ -138,6 +133,41 @@ for message in st.session_state.messages:
             img = Image.open(BytesIO(message["image_bytes"]))
             st.image(img, caption=message.get("caption"))
 
+# =================================================================================
+# --- MODIFIED: New Main Chat Logic with Debugging/Trajectory View ---
+# =================================================================================
+
+# --- NEW: An async function to run the agent and capture its trajectory ---
+async def run_agent_and_capture_trajectory(agent, prompt):
+    """
+    Runs the agent using astream_events and captures the full trace of its execution.
+    """
+    trace_log = []
+    final_response = None
+    tool_used = "N/A"
+
+    # astream_events streams back all the internal steps of the LangGraph execution
+    async for event in agent.astream_events({"query": prompt}, version="v1"):
+        kind = event["event"]
+        
+        if kind == "on_chain_start":
+            if event["name"] != "LangGraph":
+                trace_log.append(f"🎬 **Step Start:** `{event['name']}`")
+                # Capture the tool name when it starts
+                if event['name'] == "comparison_chat": tool_used = "Comparison"
+                elif event['name'] == "image_generator": tool_used = "Image Gen"
+                elif event['name'] == "web_search": tool_used = "Web Search"
+
+        if kind == "on_chain_end":
+            if event["name"] != "LangGraph":
+                output = event["data"].get("output")
+                if isinstance(output, dict) and 'final_response' in output:
+                    final_response = output['final_response']
+                trace_log.append(f"✅ **Step End:** `{event['name']}`")
+
+    return final_response, "\n\n".join(trace_log), tool_used
+
+
 if prompt := st.chat_input("Ask about the latest news, create an image, or query a file..."):
     st.session_state.messages.append({"role": "user", "text": prompt})
     
@@ -145,8 +175,9 @@ if prompt := st.chat_input("Ask about the latest news, create an image, or query
         with st.spinner("Agent is working..."):
             start_time = time.time()
             tool_used_key = ""
-            
+
             if uploaded_file:
+                # File Analysis logic remains separate
                 tool_used_key = "File Analysis"
                 file_bytes = uploaded_file.read()
                 file_text = ""
@@ -166,50 +197,63 @@ if prompt := st.chat_input("Ask about the latest news, create an image, or query
                 response_stream = file_analysis_tool(prompt, file_text, google_api_key)
                 full_response = st.write_stream(response_stream)
                 st.session_state.messages.append({"role": "assistant", "text": full_response})
-
+            
             else:
                 agent = build_agent(google_api_key, groq_api_key, pollinations_token, tavily_api_key)
-                result = agent.invoke({"query": prompt})
-                final_response = result.get("final_response", {})
                 
-                route = result.get("route", "comparison_chat")
-                if route == "comparison_chat": tool_used_key = "Comparison"
-                elif route == "image_generator": tool_used_key = "Image Gen"
-                elif route == "web_search": tool_used_key = "Web Search"
+                # Run the async function to get the final answer and the trace
+                final_response, trace, tool_used_key = asyncio.run(run_agent_and_capture_trajectory(agent, prompt))
 
+                # Store the trace for the debug view
+                st.session_state.trajectory.append({"prompt": prompt, "trace": trace})
+
+                # --- Display the final response ---
                 if isinstance(final_response, str):
+                    st.markdown(final_response)
                     st.session_state.messages.append({"role": "assistant", "text": final_response})
+
                 elif isinstance(final_response, dict) and "image" in final_response:
                     img_data = final_response["image"]
                     buf = BytesIO()
                     img_data.save(buf, format="PNG")
                     byte_im = buf.getvalue()
+                    st.image(byte_im, caption=final_response.get("caption", prompt))
                     st.session_state.messages.append({
-                        "role": "assistant", "image_bytes": byte_im,
+                        "role": "assistant", "image_bytes": byte_im, "text": f"Image generated for: *{prompt}*",
                         "caption": final_response.get("caption", prompt)
                     })
                 else:
                     error_message = final_response.get("error", "Sorry, something went wrong.")
+                    st.markdown(f"Error: {error_message}")
                     st.session_state.messages.append({"role": "assistant", "text": f"Error: {error_message}"})
             
+            # --- Metrics Recording ---
             end_time = time.time()
             latency = end_time - start_time
-            
             metrics = st.session_state.metrics
             metrics["total_requests"] += 1
-            if tool_used_key:
+            if tool_used_key and tool_used_key in metrics["tool_usage"]:
                 metrics["tool_usage"][tool_used_key] += 1
             metrics["total_latency"] += latency
             metrics["average_latency"] = metrics["total_latency"] / metrics["total_requests"]
             metrics["last_query_details"] = {
-                "timestamp": datetime.now().isoformat(),
-                "prompt": prompt,
-                "tool_used": tool_used_key,
-                "latency_seconds": round(latency, 2)
+                "timestamp": datetime.now().isoformat(), "prompt": prompt,
+                "tool_used": tool_used_key, "latency_seconds": round(latency, 2)
             }
-    
-    st.rerun()
+            
+            st.rerun()
 
+# --- NEW: Display the Agent Trajectory / Debug View ---
+if st.session_state.trajectory:
+    with st.expander("🕵️ Agent Trajectory / Debug View", expanded=False):
+        # Display the latest trajectory first
+        for run in reversed(st.session_state.trajectory):
+            st.markdown(f"#### Prompt: *'{run['prompt']}'*")
+            st.markdown(run['trace'])
+            st.markdown("---")
+
+
+# --- Feedback buttons logic (Unchanged) ---
 if st.session_state.messages and st.session_state.messages[-1]["role"] == "assistant":
     message_id = len(st.session_state.messages) - 1
 
