@@ -15,6 +15,42 @@ import json # --- NEW IMPORT for pretty-printing dictionaries ---
 
 # Import the agent logic (no changes needed in agent.py)
 from agent import build_agent, file_analysis_tool
+# --- NEW: A custom function to create a copy-to-clipboard button ---
+def create_copy_button(text_to_copy: str, button_key: str):
+    """
+    Creates a button in Streamlit that copies the given text to the clipboard.
+    """
+    # Unique IDs for HTML elements
+    button_id = f"copy_btn_{button_key}"
+    text_id = f"text_{button_key}"
+
+    # The HTML part: a hidden element to hold the text and a button
+    html_code = f"""
+        <textarea id="{text_id}" style="position: absolute; left: -9999px;">{text_to_copy}</textarea>
+        <button id="{button_id}">Copy Text</button>
+    """
+
+    # The JavaScript part: finds the elements and adds the copy logic
+    js_code = f"""
+        <script>
+            document.getElementById("{button_id}").addEventListener("click", function() {{
+                var text = document.getElementById("{text_id}").value;
+                navigator.clipboard.writeText(text).then(function() {{
+                    var btn = document.getElementById("{button_id}");
+                    var originalText = btn.innerHTML;
+                    btn.innerHTML = 'Copied!';
+                    setTimeout(function() {{
+                        btn.innerHTML = originalText;
+                    }}, 2000);
+                }}, function(err) {{
+                    console.error('Could not copy text: ', err);
+                }});
+            }});
+        </script>
+    """
+    
+    # Combine and render using st.components.v1.html
+    st.components.v1.html(html_code + js_code, height=50)
 
 # =====================
 # Page Config and Setup
@@ -129,18 +165,19 @@ with st.sidebar:
 # ===================================================================
 # --- MODIFIED: Main Chat Display Logic with Copy/Download Buttons ---
 # ===================================================================
+# ===================================================================
+# --- MODIFIED: Main Chat Display Logic with Custom Copy Button ---
+# ===================================================================
 for i, message in enumerate(st.session_state.messages):
     with st.chat_message(message["role"]):
-        # Display text responses
+        # --- Display Text Response ---
         if "text" in message:
-            # User messages are displayed with markdown
-            if message["role"] == "user":
-                st.markdown(message["text"])
-            # Assistant messages are displayed in a code block to get a copy button
-            else:
-                st.code(message["text"], language="text")
+            st.markdown(message["text"])
+            # --- ADDED: A custom copy button for the assistant's text response ---
+            if message["role"] == "assistant":
+                create_copy_button(message["text"], button_key=f"text_copy_{i}")
 
-        # Display image responses with a download button
+        # --- Display Image with a Download Button ---
         if "image_bytes" in message:
             img = Image.open(BytesIO(message["image_bytes"]))
             st.image(img, caption=message.get("caption"))
@@ -150,9 +187,8 @@ for i, message in enumerate(st.session_state.messages):
                 data=message["image_bytes"],
                 file_name=f"generated_image_{i}.png",
                 mime="image/png",
-                key=f"download_btn_{i}" # Unique key for each button
+                key=f"download_btn_{i}"
             )
-
 # =================================================================================
 # --- MODIFIED: AGDebugger Logic with More Detailed Tracing ---
 # =================================================================================
