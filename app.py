@@ -126,13 +126,28 @@ with st.sidebar:
 # ===============================================
 # Main Chat Display Logic (Unchanged)
 # ===============================================
-for message in st.session_state.messages:
+for i, message in enumerate(st.session_state.messages):
     with st.chat_message(message["role"]):
+        # --- Display Text Response ---
         if "text" in message:
             st.markdown(message["text"])
+            # --- ADDED: A copy button for the text response ---
+            if message["role"] == "assistant":
+                st.code(message["text"], language="text")
+
+        # --- Display Image ---
         if "image_bytes" in message:
             img = Image.open(BytesIO(message["image_bytes"]))
             st.image(img, caption=message.get("caption"))
+            
+            # --- ADDED: A download button for the generated image ---
+            st.download_button(
+                label="⬇️ Download Image",
+                data=message["image_bytes"],
+                file_name=f"generated_image_{i}.png",
+                mime="image/png",
+                key=f"download_btn_{i}" # Unique key for each button
+            )
 
 # =================================================================================
 # --- MODIFIED: AGDebugger Logic with More Detailed Tracing ---
