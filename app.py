@@ -126,21 +126,25 @@ with st.sidebar:
 # ===============================================
 # Main Chat Display Logic (Unchanged)
 # ===============================================
+# ===================================================================
+# --- MODIFIED: Main Chat Display Logic with Copy/Download Buttons ---
+# ===================================================================
 for i, message in enumerate(st.session_state.messages):
     with st.chat_message(message["role"]):
-        # --- Display Text Response ---
+        # Display text responses
         if "text" in message:
-            st.markdown(message["text"])
-            # --- ADDED: A copy button for the text response ---
-            if message["role"] == "assistant":
+            # User messages are displayed with markdown
+            if message["role"] == "user":
+                st.markdown(message["text"])
+            # Assistant messages are displayed in a code block to get a copy button
+            else:
                 st.code(message["text"], language="text")
 
-        # --- Display Image ---
+        # Display image responses with a download button
         if "image_bytes" in message:
             img = Image.open(BytesIO(message["image_bytes"]))
             st.image(img, caption=message.get("caption"))
             
-            # --- ADDED: A download button for the generated image ---
             st.download_button(
                 label="⬇️ Download Image",
                 data=message["image_bytes"],
