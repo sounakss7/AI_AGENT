@@ -10,7 +10,8 @@ import time
 import pandas as pd
 import random
 from urllib.parse import quote_plus
-import asyncio  # --- NEW IMPORT ---
+import asyncio
+import json # --- NEW IMPORT for pretty-printing dictionaries ---
 
 # Import the agent logic (no changes needed in agent.py)
 from agent import build_agent, file_analysis_tool
@@ -134,26 +135,31 @@ for message in st.session_state.messages:
             st.image(img, caption=message.get("caption"))
 
 # =================================================================================
-# --- MODIFIED: New Main Chat Logic with Debugging/Trajectory View ---
+# --- MODIFIED: AGDebugger Logic with More Detailed Tracing ---
 # =================================================================================
 
-# --- NEW: An async function to run the agent and capture its trajectory ---
+# --- MODIFIED: This function now captures much more detail ---
 async def run_agent_and_capture_trajectory(agent, prompt):
     """
-    Runs the agent using astream_events and captures the full trace of its execution.
+    Runs the agent using astream_events and captures a detailed trace of its execution,
+    including inputs and outputs for each step.
     """
-    trace_log = []
+    trace_steps = []
+    current_step = {}
     final_response = None
     tool_used = "N/A"
 
-    # astream_events streams back all the internal steps of the LangGraph execution
     async for event in agent.astream_events({"query": prompt}, version="v1"):
         kind = event["event"]
         
         if kind == "on_chain_start":
             if event["name"] != "LangGraph":
-                trace_log.append(f"🎬 **Step Start:** `{event['name']}`")
-                # Capture the tool name when it starts
+                current_step = {
+                    "name": event["name"],
+                    "input": event["data"].get("input"),
+                    "output": None
+                }
+                # Capture the friendly tool name
                 if event['name'] == "comparison_chat": tool_used = "Comparison"
                 elif event['name'] == "image_generator": tool_used = "Image Gen"
                 elif event['name'] == "web_search": tool_used = "Web Search"
@@ -161,11 +167,28 @@ async def run_agent_and_capture_trajectory(agent, prompt):
         if kind == "on_chain_end":
             if event["name"] != "LangGraph":
                 output = event["data"].get("output")
+                if current_step.get("name") == event["name"]:
+                    current_step["output"] = output
+                    trace_steps.append(current_step)
+                    current_step = {}
+                
                 if isinstance(output, dict) and 'final_response' in output:
                     final_response = output['final_response']
-                trace_log.append(f"✅ **Step End:** `{event['name']}`")
 
-    return final_response, "\n\n".join(trace_log), tool_used
+    return final_response, trace_steps, tool_used
+
+# --- NEW: Helper function to pretty-print dictionaries, handling non-serializable objects ---
+def pretty_print_dict(d):
+    def safe_converter(o):
+        if isinstance(o, (Image.Image, bytes)):
+            return f"<{type(o).__name__} object>"
+        return str(o)
+    
+    # Check if the object is a dict before trying to dump it
+    if not isinstance(d, dict):
+        return f"```\n{str(d)}\n```"
+        
+    return "```json\n" + json.dumps(d, indent=2, default=safe_converter) + "\n```"
 
 
 if prompt := st.chat_input("Ask about the latest news, create an image, or query a file..."):
@@ -201,17 +224,16 @@ if prompt := st.chat_input("Ask about the latest news, create an image, or query
             else:
                 agent = build_agent(google_api_key, groq_api_key, pollinations_token, tavily_api_key)
                 
-                # Run the async function to get the final answer and the trace
-                final_response, trace, tool_used_key = asyncio.run(run_agent_and_capture_trajectory(agent, prompt))
+                # Run the async function to get the final answer and the detailed trace
+                final_response, trace_steps, tool_used_key = asyncio.run(run_agent_and_capture_trajectory(agent, prompt))
 
-                # Store the trace for the debug view
-                st.session_state.trajectory.append({"prompt": prompt, "trace": trace})
+                # Store the structured trace for the debug view
+                st.session_state.trajectory.append({"prompt": prompt, "steps": trace_steps})
 
-                # --- Display the final response ---
+                # --- Display the final response (logic is unchanged) ---
                 if isinstance(final_response, str):
                     st.markdown(final_response)
                     st.session_state.messages.append({"role": "assistant", "text": final_response})
-
                 elif isinstance(final_response, dict) and "image" in final_response:
                     img_data = final_response["image"]
                     buf = BytesIO()
@@ -227,7 +249,7 @@ if prompt := st.chat_input("Ask about the latest news, create an image, or query
                     st.markdown(f"Error: {error_message}")
                     st.session_state.messages.append({"role": "assistant", "text": f"Error: {error_message}"})
             
-            # --- Metrics Recording ---
+            # --- Metrics Recording (logic is unchanged) ---
             end_time = time.time()
             latency = end_time - start_time
             metrics = st.session_state.metrics
@@ -243,13 +265,24 @@ if prompt := st.chat_input("Ask about the latest news, create an image, or query
             
             st.rerun()
 
-# --- NEW: Display the Agent Trajectory / Debug View ---
+# --- MODIFIED: Display the detailed Agent Trajectory / Debug View ---
 if st.session_state.trajectory:
     with st.expander("🕵️ Agent Trajectory / Debug View", expanded=False):
-        # Display the latest trajectory first
         for run in reversed(st.session_state.trajectory):
             st.markdown(f"#### Prompt: *'{run['prompt']}'*")
-            st.markdown(run['trace'])
+            for step in run['steps']:
+                st.markdown(f"##### 🎬 Step: `{step['name']}`")
+                
+                # Display Input
+                with st.container(border=True):
+                    st.markdown("**Input:**")
+                    st.markdown(pretty_print_dict(step['input']), unsafe_allow_html=True)
+                
+                # Display Output
+                with st.container(border=True):
+                    st.markdown("**Output:**")
+                    st.markdown(pretty_print_dict(step['output']), unsafe_allow_html=True)
+                
             st.markdown("---")
 
 
