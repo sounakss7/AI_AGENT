@@ -10,6 +10,8 @@ from langgraph.graph import StateGraph, END
 import concurrent.futures
 from functools import partial
 from tavily import TavilyClient
+from urllib.parse import quote_plus # --- NEW IMPORT ---
+import logging
 
 # =======================================================================================
 # TOOL 1: THE COMPARISON & EVALUATION WORKFLOW
@@ -86,23 +88,37 @@ def comparison_and_evaluation_tool(query: str, google_api_key: str, groq_api_key
 # ===================================================================
 # TOOL 2: IMAGE GENERATION TOOL
 # ===================================================================
-
 def image_generation_tool(prompt: str, google_api_key: str, pollinations_token: str) -> dict:
     """Use this tool when the user asks to create, draw, or generate an image."""
-    print("---TOOL: Generating Image---")
+    logging.info(f"---TOOL: Generating Image for prompt: '{prompt}'---")
     try:
         enhancer_llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=google_api_key)
         enhancer_prompt = f"Rewrite this short prompt into a detailed, vibrant, and artistic image generation description: {prompt}"
         final_prompt = enhancer_llm.invoke(enhancer_prompt).content.strip()
         
-        url = f"https://image.pollinations.ai/prompt/{final_prompt}?token={pollinations_token}"
-        img_bytes = requests.get(url).content
+        # --- FIX 1: URL Encode the prompt to handle special characters ---
+        encoded_prompt = quote_plus(final_prompt)
+        
+        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?token={pollinations_token}"
+        
+        # --- FIX 2: Add a timeout to prevent the app from freezing ---
+        response = requests.get(url, timeout=30)
+        
+        # --- FIX 3: Check if the request was successful before processing ---
+        response.raise_for_status()  # This will raise an error for bad status codes (4xx or 5xx)
+        
+        # If the above line passes, we know we have a valid response
+        img_bytes = response.content
         img = Image.open(BytesIO(img_bytes))
         
         return {"image": img, "caption": f"Your prompt: '{prompt}'"}
-    except Exception as e:
-        return {"error": f"Failed to generate image: {e}"}
 
+    except requests.exceptions.HTTPError as http_err:
+        logging.error(f"HTTP error occurred: {http_err} - Response: {response.text}")
+        return {"error": f"The image generation service returned an error: {http_err}"}
+    except Exception as e:
+        logging.error(f"An unexpected error occurred in image generation: {e}")
+        return {"error": f"Failed to generate image: {e}"}
 # ===================================================================
 # TOOL 3: FILE ANALYSIS TOOL (Streams output)
 # ===================================================================
