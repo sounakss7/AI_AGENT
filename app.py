@@ -266,22 +266,27 @@ if prompt := st.chat_input("Ask about the latest news, create an image, or query
             st.rerun()
 
 # --- MODIFIED: Display the detailed Agent Trajectory / Debug View ---
+# --- THIS IS THE NEW, ROBUST CODE ---
 if st.session_state.trajectory:
     with st.expander("🕵️ Agent Trajectory / Debug View", expanded=False):
         for run in reversed(st.session_state.trajectory):
-            st.markdown(f"#### Prompt: *'{run['prompt']}'*")
-            for step in run['steps']:
-                st.markdown(f"##### 🎬 Step: `{step['name']}`")
+            st.markdown(f"#### Prompt: *'{run.get('prompt', 'N/A')}'*")
+            
+            # Safely get the 'steps' list, defaulting to an empty list if it doesn't exist
+            steps = run.get('steps', [])
+            
+            for step in steps:
+                st.markdown(f"##### 🎬 Step: `{step.get('name', 'Unknown Step')}`")
                 
                 # Display Input
                 with st.container(border=True):
                     st.markdown("**Input:**")
-                    st.markdown(pretty_print_dict(step['input']), unsafe_allow_html=True)
+                    st.markdown(pretty_print_dict(step.get('input', {})), unsafe_allow_html=True)
                 
                 # Display Output
                 with st.container(border=True):
                     st.markdown("**Output:**")
-                    st.markdown(pretty_print_dict(step['output']), unsafe_allow_html=True)
+                    st.markdown(pretty_print_dict(step.get('output', {})), unsafe_allow_html=True)
                 
             st.markdown("---")
 
