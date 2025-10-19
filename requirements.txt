@@ -21,7 +21,9 @@ feedparser
 langgraph
 tavily-python
 pandas
-langchain
-langchain-core
-langchain-google-genai
-langgraph
+# --- LangChain Ecosystem (COMPATIBLE SET) ---
+langchain==0.1.17
+langchain-core==0.1.52
+langchain-google-genai==0.0.11
+langchain-openai==0.1.7
+langgraph==0.0.30
