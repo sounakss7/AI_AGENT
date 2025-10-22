@@ -1,31 +1,33 @@
-PyPDF2
+# ===== Core Libraries =====
 streamlit
 python-dotenv
-langchain
-langchain-google-genai
-google-generativeai
-fal-client
-openai
-langchain-openai
-pillow
-python-dotenv
 requests
-audio-recorder-streamlit
+pandas
+
+# ===== PDF & Image Processing =====
 PyPDF2
 pytesseract
 pdf2image
 Pillow
 pymupdf
+
+# ===== Audio & Logging =====
+audio-recorder-streamlit
 concurrent-log-handler
 feedparser
-langgraph
+
+# ===== AI / ML Integrations =====
+openai
+fal-client
 tavily-python
-pandas
-# --- LangChain Ecosystem (COMPATIBLE SET) ---
-# --- LangChain Ecosystem (Stable & Compatible) ---
+
+# ===== LangChain Ecosystem (Stable & Compatible) =====
 langchain==0.1.17
 langchain-core==0.1.45
 langchain-community==0.0.24
 langchain-google-genai==0.0.10
 langchain-openai==0.1.7
 google-generativeai==0.4.1
+
+# ===== Optional (Graph routing support) =====
+langgraph==0.0.30
