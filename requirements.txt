@@ -22,13 +22,10 @@ langgraph
 tavily-python
 pandas
 # --- LangChain Ecosystem (COMPATIBLE SET) ---
-langchain==0.1.17
-langchain-core==0.1.52
-langchain-google-genai==0.0.11
-langchain-openai==0.1.7
-langgraph==0.0.30  
-langchain>=1.0.0
-langchain-core>=1.0.0
-langgraph>=1.0.0
-langchain-google-genai>=1.0.0
-langchain-openai>=1.0.0
+# --- LangChain Ecosystem (Stable for Gemini on Streamlit Cloud) ---
+langchain==0.1.14
+langchain-core==0.1.42
+langchain-community==0.0.20
+langchain-google-genai==0.0.8
+langchain-openai==0.1.6
+google-generativeai==0.4.1
