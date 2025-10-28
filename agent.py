@@ -3,16 +3,15 @@ import re
 import requests
 from io import BytesIO
 from PIL import Image
-from typing import TypedDict, Optional, List 
+from typing import TypedDict, Optional
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.schema import HumanMessage, SystemMessage
+from langchain.schema import HumanMessage
 from langgraph.graph import StateGraph, END
 import concurrent.futures
 from functools import partial
 from tavily import TavilyClient
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus # --- NEW IMPORT ---
 import logging
-from pydantic import BaseModel, Field 
 
 # =======================================================================================
 # TOOL 1: THE COMPARISON & EVALUATION WORKFLOW
@@ -45,7 +44,9 @@ def comparison_and_evaluation_tool(query: str, google_api_key: str, groq_api_key
     """
     print("---TOOL: Executing the Comparison & Evaluation Workflow---")
     
+    # Use the fast model for the head-to-head comparison
     fast_llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=google_api_key)
+    # Use the powerful model for the critical task of judging
     judge_llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=google_api_key)
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -95,11 +96,18 @@ def image_generation_tool(prompt: str, google_api_key: str, pollinations_token: 
         enhancer_prompt = f"Rewrite this short prompt into a detailed, vibrant, and artistic image generation description: {prompt}"
         final_prompt = enhancer_llm.invoke(enhancer_prompt).content.strip()
         
+        # --- FIX 1: URL Encode the prompt to handle special characters ---
         encoded_prompt = quote_plus(final_prompt)
-        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?token={pollinations_token}"
-        response = requests.get(url, timeout=30)
-        response.raise_for_status() 
         
+        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?token={pollinations_token}"
+        
+        # --- FIX 2: Add a timeout to prevent the app from freezing ---
+        response = requests.get(url, timeout=30)
+        
+        # --- FIX 3: Check if the request was successful before processing ---
+        response.raise_for_status()  # This will raise an error for bad status codes (4xx or 5xx)
+        
+        # If the above line passes, we know we have a valid response
         img_bytes = response.content
         img = Image.open(BytesIO(img_bytes))
         
@@ -111,18 +119,20 @@ def image_generation_tool(prompt: str, google_api_key: str, pollinations_token: 
     except Exception as e:
         logging.error(f"An unexpected error occurred in image generation: {e}")
         return {"error": f"Failed to generate image: {e}"}
-
 # ===================================================================
-# TOOL 3: FILE ANALYSIS TOOL (This was in your original code)
+# TOOL 3: FILE ANALYSIS TOOL (Streams output)
 # ===================================================================
 
 def file_analysis_tool(question: str, file_content_as_text: str, google_api_key: str):
     """
     Use this tool when the user has uploaded a file and is asking a question about it.
+    This tool is now empowered to use its own expertise to provide a comprehensive analysis.
     """
     print("---TOOL: Executing Empowered File Analysis---")
+    # Using a more powerful model for high-quality analysis and evaluation
     streaming_llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=google_api_key, streaming=True) 
     
+    # This new, "freer" prompt gives the agent permission to be a true expert.
     prompt = f"""
     **Your Persona:** You are a highly intelligent AI assistant and a multi-disciplinary expert. Your goal is to provide the most helpful and insightful analysis possible, combining the provided file content with your own vast knowledge.
 
@@ -130,7 +140,7 @@ def file_analysis_tool(question: str, file_content_as_text: str, google_api_key:
 
     **How to Behave Based on File Content:**
     * **If the file appears to be CODE (e.g., Python, JavaScript, etc.):** Act as a senior software engineer. Analyze its structure, logic, efficiency, and style. If the user asks for a score or review, provide a thoughtful evaluation with justifications and suggestions for improvement.
-    * **If the file appears to be TEXT (e.g., an article, report, essay):** Act as a research analyst. Summarize key points, extract specific information, and answer the user's questions.
+    * **If the file appears to be TEXT (e.g., an article, report, essay):** Act as a research analyst. Summarize key points, extract specific information, and answer the user's questions. You can add relevant context from your own knowledge if it enhances the answer (e.g., providing historical context for an article).
     * **For all other file types:** Do your best to interpret the text content and provide a helpful, intelligent response to the user's question.
 
     **User's Question:**
@@ -146,7 +156,11 @@ def file_analysis_tool(question: str, file_content_as_text: str, google_api_key:
     return streaming_llm.stream([HumanMessage(content=prompt)])
 
 # ===================================================================
-# TOOL 4: WEB SEARCH & REAL-TIME DATA ANALYSIS
+# THE AGENT: A "WORKSHOP MANAGER" THAT CHOOSES THE RIGHT TOOL
+# ===================================================================
+
+# ===================================================================
+# NEW TOOL 3: WEB SEARCH & REAL-TIME DATA ANALYSIS
 # ===================================================================
 def web_search_tool(query: str, tavily_api_key: str, google_api_key: str) -> str:
     """
@@ -156,10 +170,13 @@ def web_search_tool(query: str, tavily_api_key: str, google_api_key: str) -> str
     print("---TOOL: Executing Web Search and Analysis---")
     try:
         tavily = TavilyClient(api_key=tavily_api_key)
+        # Perform a search and get the most relevant results
         search_results = tavily.search(query=query, search_depth="advanced", max_results=5)
         
+        # Extract the content from the search results
         search_content = "\n".join([result["content"] for result in search_results["results"]])
         
+        # Use a powerful LLM to analyze the search results and answer the user's query
         analyzer_llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=google_api_key)
         analysis_prompt = f"""
         You are an expert research analyst. You have been given a user's query and the results from a web search.
@@ -181,100 +198,12 @@ def web_search_tool(query: str, tavily_api_key: str, google_api_key: str) -> str
         
     except Exception as e:
         return f"⚠️ Web search failed: {e}"
-
-# ===================================================================
-# NEW TOOL 5: STRUCTURED CODE REVIEWER TOOL
-# ===================================================================
-
-class CodeReview(BaseModel):
-    """
-    This Pydantic model defines the exact JSON structure 
-    we want the AI to return after reviewing the code.
-    """
-    errors: List[str] = Field(
-        description="A list of errors found (e.g., 'SyntaxError on line 5', 'Logic error in function calc_average')."
-    )
-    corrected_code: str = Field(
-        description="The complete, corrected version of the user's code."
-    )
-    score: int = Field(
-        description="A score from 0 (terrible) to 100 (perfect) for the original code's quality, logic, and style."
-    )
-    feedback: str = Field(
-        description="Detailed, constructive feedback explaining the score, the errors, and the 'why' behind the corrections."
-    )
-
-def code_reviewer_tool(user_code: str, google_api_key: str) -> dict:
-    """
-    A specialized agent tool that reviews code, assigns a score,
-    and provides corrections and feedback, returning everything
-    in a structured JSON object.
-    """
-    print("---TOOL: Executing Code Review & Grading---")
-    
-    try:
-        llm = ChatGoogleGenerativeAI(
-            model="gemini-2.5-flash", 
-            google_api_key=google_api_key
-        )
-        
-        structured_llm = llm.with_structured_output(CodeReview)
-
-        system_prompt = """
-        You are an expert Senior Software Engineer and a strict but fair code reviewer.
-        Your task is to analyze a piece of code submitted by a junior developer.
-
-        You must perform the following actions:
-        1.  **Detect Errors:** Identify all syntax errors, logic errors, style issues (non-PEP-8), and potential bugs.
-        2.  **Assign Score:** Grade the original code on a scale of 0 to 100, based on its correctness, efficiency, and readability.
-        3.  **Provide Corrections:** Write the complete, corrected version of the code.
-        4.  **Give Feedback:** Write a detailed, constructive feedback paragraph explaining *why* you gave that score, what the key errors were, and how the corrected code fixes them.
-
-        You MUST return your entire analysis in the required JSON format.
-        If the code is perfect, give it a 100, list no errors, and return the original code in the 'corrected_code' field.
-        """
-
-        user_prompt = f"""
-        Please review the following code:
-        
-        ```
-        {user_code}
-        ```
-        """
-        
-        messages = [
-            SystemMessage(content=system_prompt),
-            HumanMessage(content=user_prompt)
-        ]
-
-        response = structured_llm.invoke(messages)
-
-        return response.dict()
-
-    except Exception as e:
-        logging.error(f"An error occurred in code_reviewer_tool: {e}")
-        return {
-            "error": f"Failed to review code: {e}",
-            "errors": [],
-            "corrected_code": "Unable to provide corrections.",
-            "score": 0,
-            "feedback": "An internal error occurred."
-        }
-
-
-# ===================================================================
-# THE AGENT: A "WORKSHOP MANAGER" THAT CHOOSES THE RIGHT TOOL
-# ===================================================================
     
 class AgentState(TypedDict):
-    """This TypedDict defines the state of our graph.
-    It's what's passed between nodes."""
     query: str
-    route: str
+    route: str  # Add this key to store the router's decision
     final_response: Optional[any]
-
-# --- Node Wrapper Functions ---
-
+# These are wrapper functions for the nodes to handle passing state and API keys
 def call_comparison_tool(state: AgentState, google_api_key: str, groq_api_key: str):
     response = comparison_and_evaluation_tool(state['query'], google_api_key, groq_api_key)
     return {"final_response": response}
@@ -282,44 +211,28 @@ def call_comparison_tool(state: AgentState, google_api_key: str, groq_api_key: s
 def call_image_tool(state: AgentState, google_api_key: str, pollinations_token: str):
     response = image_generation_tool(state['query'], google_api_key, pollinations_token)
     return {"final_response": response}
-
 def call_web_search_tool(state: AgentState, tavily_api_key: str, google_api_key: str):
     response = web_search_tool(state['query'], tavily_api_key, google_api_key)
     return {"final_response": response}
 
-def call_code_reviewer(state: AgentState, google_api_key: str):
-    """Wrapper for the new code reviewer tool."""
-    code_to_review = state['query'] 
-    response = code_reviewer_tool(code_to_review, google_api_key)
-    return {"final_response": response}
-
-
 def router(state: AgentState, google_api_key: str):
-    """
-    The 'brain' of the agent. This node decides which tool to use
-    and updates the 'route' key in the AgentState.
-    """
+    """The brain of the agent. Decides which tool to use and updates the 'route' state key."""
     print("---AGENT: Routing query---")
     router_llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=google_api_key)
     query = state['query']
     
     router_prompt = f"""
-    You are a master routing agent. Determine the user's primary intent and select the appropriate tool. You have four choices:
-    
-    1.  `comparison_tool`: Use for complex questions, general coding problems, analysis, or any text-based query needing a detailed, evaluated answer.
+    You are a master routing agent. Determine the user's primary intent and select the appropriate tool. You have two choices:
+    1.  `comparison_tool`: Use for complex questions, coding problems, analysis, or any text-based query needing a detailed, evaluated answer.
     2.  `image_generation_tool`: Use ONLY if the user explicitly asks to create, draw, or generate an image.
     3.  `web_search_tool`: Use this for any query that requires real-time, up-to-date information. This includes questions about current events, news, weather, recent scientific discoveries, or topics created after 2023.
-    4.  `code_reviewer`: Use ONLY if the user asks to "review my code", "grade my code", "find errors in my code", "feedback on this script", or submits a block of code and asks for analysis.
 
     User Query: "{query}"
-    Return ONLY the tool name (`comparison_tool`, `image_generation_tool`, `web_search_tool`, or `code_reviewer`).
+    Return ONLY the tool name (`comparison_tool` or `image_generation_tool` or `web_search_tool`).
     """
     response = router_llm.invoke(router_prompt).content.strip()
     
-    if "code_reviewer" in response:
-        print("---AGENT: Decision -> Code Review Tool---")
-        return {"route": "code_reviewer"}
-    elif "web_search_tool" in response:
+    if "web_search_tool" in response:
         print("---AGENT: Decision -> Web Search Tool---")
         return {"route": "web_search"}
     elif "image_generation_tool" in response:
@@ -328,42 +241,30 @@ def router(state: AgentState, google_api_key: str):
     else:
         print("---AGENT: Decision -> Comparison & Evaluation Tool---")
         return {"route": "comparison_chat"}
-
 # --- Define the Agentic Graph ---
 def build_agent(google_api_key: str, groq_api_key: str, pollinations_token: str , tavily_api_key: str ):
-    """
-    Builds the complete, runnable LangGraph agent.
-    """
     workflow = StateGraph(AgentState)
 
     router_with_keys = partial(router, google_api_key=google_api_key)
     comparison_node = partial(call_comparison_tool, google_api_key=google_api_key, groq_api_key=groq_api_key)
     image_node = partial(call_image_tool, google_api_key=google_api_key, pollinations_token=pollinations_token)
     web_search_node = partial(call_web_search_tool, tavily_api_key=tavily_api_key, google_api_key=google_api_key)
-    code_review_node = partial(call_code_reviewer, google_api_key=google_api_key)
 
     workflow.add_node("router", router_with_keys)
     workflow.add_node("comparison_chat", comparison_node)
     workflow.add_node("image_generator", image_node)
     workflow.add_node("web_search", web_search_node)
-    workflow.add_node("code_reviewer", code_review_node)
 
     workflow.set_entry_point("router")
     
+    # The conditional edge function now simply reads the 'route' from the state
     workflow.add_conditional_edges(
         "router",
         lambda state: state["route"],
-        {
-            "comparison_chat": "comparison_chat", 
-            "image_generator": "image_generator", 
-            "web_search": "web_search",
-            "code_reviewer": "code_reviewer"
-        }
+        {"comparison_chat": "comparison_chat", "image_generator": "image_generator" , "web_search": "web_search"}
     )
     
     workflow.add_edge("comparison_chat", END)
     workflow.add_edge("image_generator", END)
     workflow.add_edge("web_search", END)
-    workflow.add_edge("code_reviewer", END)
-    
     return workflow.compile()
