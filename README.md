@@ -1,5 +1,6 @@
 # 🧠 AI Agent Workshop
-
+# ✨ Try the Live Demo
+**[https://mutimodal.streamlit.app/](https://mutimodal.streamlit.app/)**
 [![Python Version](https://img.shields.io/badge/Python-3.9%2B-blue.svg)](https://www.python.org/downloads/)
 [![Framework](https://img.shields.io/badge/Framework-Streamlit-red.svg)](https://streamlit.io)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
