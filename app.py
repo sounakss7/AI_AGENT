@@ -14,7 +14,7 @@ import asyncio
 import json
 
 # --- UPDATE 1: Import from your agent_app.py file ---
-from agent_app import build_agent, file_analysis_tool
+from agent import build_agent, file_analysis_tool
 
 # --- UPDATE 2: create_copy_button modified for better compatibility ---
 def create_copy_button(text_to_copy: str, button_key: str):
