@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://mutimodal.streamlit.app/)
 # ✨ Try the Live Demo
-**[https://mutimodal.streamlit.app/](AGENTIC-MIND)**
+**[AGENTIC_MIND 🧠](https://mutimodal.streamlit.app/)**
 ---
 An advanced multi-tool AI agent built with Streamlit and LangGraph. This interactive web application serves as a workshop to demonstrate and test the capabilities of a modern AI agent that can search the web, generate images, perform comparative analysis between models, and analyze user-uploaded files.
 
