@@ -11,80 +11,45 @@ import pandas as pd
 import random
 from urllib.parse import quote_plus
 import asyncio
-import json
+import json # --- NEW IMPORT for pretty-printing dictionaries ---
 
-# Import the agent logic
+# Import the agent logic (no changes needed in agent.py)
 from agent import build_agent, file_analysis_tool
-
-# --- NEW HELPER FUNCTION ---
-def stream_langchain_response(langchain_stream):
-    """Converts a LangChain stream (of AIMessageChunks) into a generator of strings."""
-    for chunk in langchain_stream:
-        if chunk.content:
-            yield chunk.content
-# --- END NEW HELPER FUNCTION ---
-
-
+# --- NEW: A custom function to create a copy-to-clipboard button ---
 def create_copy_button(text_to_copy: str, button_key: str):
     """
-    Creates a button in Streamlit that copies the given text to the clipboard
-    using document.execCommand('copy') for better iFrame compatibility.
+    Creates a button in Streamlit that copies the given text to the clipboard.
     """
+    # Unique IDs for HTML elements
     button_id = f"copy_btn_{button_key}"
     text_id = f"text_{button_key}"
 
     # The HTML part: a hidden element to hold the text and a button
-    # Using <textarea> is crucial for .select() to work
     html_code = f"""
         <textarea id="{text_id}" style="position: absolute; left: -9999px;">{text_to_copy}</textarea>
         <button id="{button_id}">Copy Text</button>
     """
 
-    # The JavaScript part: updated to use execCommand
+    # The JavaScript part: finds the elements and adds the copy logic
     js_code = f"""
         <script>
             document.getElementById("{button_id}").addEventListener("click", function() {{
-                var textElem = document.getElementById("{text_id}");
-                
-                // --- Fallback for iOS ---
-                var isOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-                if (isOS) {{
-                    var range = document.createRange();
-                    range.selectNodeContents(textElem);
-                    var selection = window.getSelection();
-                    selection.removeAllRanges();
-                    selection.addRange(range);
-                    textElem.setSelectionRange(0, 999999);
-                }} else {{
-                    textElem.select();
-                }}
-
-                try {{
-                    var successful = document.execCommand('copy');
+                var text = document.getElementById("{text_id}").value;
+                navigator.clipboard.writeText(text).then(function() {{
                     var btn = document.getElementById("{button_id}");
                     var originalText = btn.innerHTML;
-                    if (successful) {{
-                        btn.innerHTML = 'Copied!';
-                    }} else {{
-                        btn.innerHTML = 'Error';
-                    }}
+                    btn.innerHTML = 'Copied!';
                     setTimeout(function() {{
                         btn.innerHTML = originalText;
                     }}, 2000);
-                }} catch (err) {{
+                }}, function(err) {{
                     console.error('Could not copy text: ', err);
-                }}
-                
-                // Deselect text
-                if (window.getSelection) {{
-                    window.getSelection().removeAllRanges();
-                }} else if (document.selection) {{
-                    document.selection.empty();
-                }}
+                }});
             }});
         </script>
     """
     
+    # Combine and render using st.components.v1.html
     st.components.v1.html(html_code + js_code, height=50)
 
 # =====================
@@ -92,6 +57,7 @@ def create_copy_button(text_to_copy: str, button_key: str):
 # =====================
 st.set_page_config(page_title="🤖 AI Agent Workshop", page_icon="🧠", layout="wide")
 
+# --- Securely load API keys from Streamlit Secrets ---
 try:
     google_api_key = st.secrets["GOOGLE_API_KEY"]
     pollinations_token = st.secrets["POLLINATIONS_TOKEN"]
@@ -106,13 +72,13 @@ except KeyError as e:
 # ===============================================
 if "messages" not in st.session_state:
     st.session_state.messages = []
+# --- NEW: Add a key to store the agent's trace ---
 if "trajectory" not in st.session_state:
     st.session_state.trajectory = []
 if "metrics" not in st.session_state:
-    # --- UPDATE 3: Added "Code Reviewer" to tool_usage ---
     st.session_state.metrics = {
         "total_requests": 0,
-        "tool_usage": {"Comparison": 0, "Image Gen": 0, "Web Search": 0, "File Analysis": 0, "Code Reviewer": 0},
+        "tool_usage": {"Comparison": 0, "Image Gen": 0, "Web Search": 0, "File Analysis": 0},
         "total_latency": 0.0,
         "average_latency": 0.0,
         "accuracy_feedback": {"👍": 0, "👎": 0},
@@ -120,10 +86,10 @@ if "metrics" not in st.session_state:
     }
 
 # =====================
-# Main Application UI & Sidebar
+# Main Application UI & Sidebar (Unchanged)
 # =====================
 st.title("🧠 AI Agent Workshop")
-st.write("I can search the web, create images, analyze documents, review code, and more!")
+st.write("I can search the web, create images, analyze documents, and more!")
 
 with st.sidebar:
     st.header("🔍 Google Search")
@@ -131,7 +97,7 @@ with st.sidebar:
     if st.button("Search"):
         if search_query:
             encoded_query = quote_plus(search_query)
-            search_url = f"https.google.com/search?q={encoded_query}"
+            search_url = f"https://www.google.com/search?q={encoded_query}"
             st.markdown(f'<a href="{search_url}" target="_blank">Open Google search results</a>', unsafe_allow_html=True)
         else:
             st.warning("Please enter a search query.")
@@ -142,21 +108,18 @@ with st.sidebar:
     st.header("🧭 Utilities")
     if st.button("Clear Chat History & Reset Metrics"):
         st.session_state.messages = []
-        st.session_state.trajectory = []
-        # --- UPDATE 3: Added "Code Reviewer" to reset logic ---
+        st.session_state.trajectory = [] # --- ADDED: Clear trajectory on reset ---
         st.session_state.metrics = {
-            "total_requests": 0,
-            "tool_usage": {"Comparison": 0, "Image Gen": 0, "Web Search": 0, "File Analysis": 0, "Code Reviewer": 0},
+            "total_requests": 0, "tool_usage": {"Comparison": 0, "Image Gen": 0, "Web Search": 0, "File Analysis": 0},
             "total_latency": 0.0, "average_latency": 0.0, "accuracy_feedback": {"👍": 0, "👎": 0}, "last_query_details": {}
         }
         st.rerun()
 
     st.markdown("### 💡 AI Tip of the Day")
     st.info(random.choice([
-        "The Comparison tool uses both Gemini and Groq for a robust answer.",
+        "The Comparison tool uses both Gemini 1.5 Flash and Llama 3.1 8B for a robust answer.",
         "Ask about current events to see the Web Search tool in action!",
-        "Upload a Python file and ask for a score to test File Analysis.",
-        "Paste a code snippet and ask 'review this code' to test the Code Reviewer."
+        "Upload a Python file and ask for a score to test File Analysis."
     ]))
     
     st.markdown("### 🕒 Live Server Time")
@@ -196,16 +159,25 @@ with st.sidebar:
     with st.expander("🕵️ See Last Query Details"):
         st.json(metrics["last_query_details"])
 
+# ===============================================
+# Main Chat Display Logic (Unchanged)
+# ===============================================
 # ===================================================================
-# Main Chat Display Logic with Custom Copy Button
+# --- MODIFIED: Main Chat Display Logic with Copy/Download Buttons ---
+# ===================================================================
+# ===================================================================
+# --- MODIFIED: Main Chat Display Logic with Custom Copy Button ---
 # ===================================================================
 for i, message in enumerate(st.session_state.messages):
     with st.chat_message(message["role"]):
+        # --- Display Text Response ---
         if "text" in message:
             st.markdown(message["text"])
+            # --- ADDED: A custom copy button for the assistant's text response ---
             if message["role"] == "assistant":
                 create_copy_button(message["text"], button_key=f"text_copy_{i}")
 
+        # --- Display Image with a Download Button ---
         if "image_bytes" in message:
             img = Image.open(BytesIO(message["image_bytes"]))
             st.image(img, caption=message.get("caption"))
@@ -218,9 +190,10 @@ for i, message in enumerate(st.session_state.messages):
                 key=f"download_btn_{i}"
             )
 # =================================================================================
-# Agent Debugger Logic
+# --- MODIFIED: AGDebugger Logic with More Detailed Tracing ---
 # =================================================================================
 
+# --- MODIFIED: This function now captures much more detail ---
 async def run_agent_and_capture_trajectory(agent, prompt):
     """
     Runs the agent using astream_events and captures a detailed trace of its execution,
@@ -241,11 +214,10 @@ async def run_agent_and_capture_trajectory(agent, prompt):
                     "input": event["data"].get("input"),
                     "output": None
                 }
-                # --- UPDATE 4: Added "code_reviewer" to tool tracking ---
+                # Capture the friendly tool name
                 if event['name'] == "comparison_chat": tool_used = "Comparison"
                 elif event['name'] == "image_generator": tool_used = "Image Gen"
                 elif event['name'] == "web_search": tool_used = "Web Search"
-                elif event['name'] == "code_reviewer": tool_used = "Code Reviewer"
 
         if kind == "on_chain_end":
             if event["name"] != "LangGraph":
@@ -260,12 +232,14 @@ async def run_agent_and_capture_trajectory(agent, prompt):
 
     return final_response, trace_steps, tool_used
 
+# --- NEW: Helper function to pretty-print dictionaries, handling non-serializable objects ---
 def pretty_print_dict(d):
     def safe_converter(o):
         if isinstance(o, (Image.Image, bytes)):
             return f"<{type(o).__name__} object>"
         return str(o)
     
+    # Check if the object is a dict before trying to dump it
     if not isinstance(d, dict):
         return f"```\n{str(d)}\n```"
         
@@ -281,47 +255,40 @@ if prompt := st.chat_input("Ask about the latest news, create an image, or query
             tool_used_key = ""
 
             if uploaded_file:
+                # File Analysis logic remains separate
                 tool_used_key = "File Analysis"
                 file_bytes = uploaded_file.read()
                 file_text = ""
                 if "pdf" in uploaded_file.type:
-                    try:
-                        reader = PdfReader(BytesIO(file_bytes))
-                        for page in reader.pages: file_text += page.extract_text() or ""
-                        if not file_text.strip():
-                            st.info("No text layer found, performing OCR...")
-                            doc = fitz.open(stream=file_bytes, filetype="pdf")
-                            for page in doc:
-                                pix = page.get_pixmap()
-                                img = Image.open(BytesIO(pix.tobytes("png")))
-                                file_text += pytesseract.image_to_string(img)
-                    except Exception as e:
-                        st.error(f"Error reading PDF: {e}")
-                        file_text = ""
+                    reader = PdfReader(BytesIO(file_bytes))
+                    for page in reader.pages: file_text += page.extract_text() or ""
+                    if not file_text.strip():
+                        st.info("No text layer found, performing OCR...")
+                        doc = fitz.open(stream=file_bytes, filetype="pdf")
+                        for page in doc:
+                            pix = page.get_pixmap()
+                            img = Image.open(BytesIO(pix.tobytes("png")))
+                            file_text += pytesseract.image_to_string(img)
                 else:
                     file_text = file_bytes.decode("utf-8", errors="ignore")
                 
-                # --- THIS IS THE FIX ---
-                # 1. Call the tool to get the LangChain stream
                 response_stream = file_analysis_tool(prompt, file_text, google_api_key)
-                # 2. Use the helper function to adapt the stream for st.write_stream
-                full_response = st.write_stream(stream_langchain_response(response_stream))
-                # --- END OF FIX ---
-
+                full_response = st.write_stream(response_stream)
                 st.session_state.messages.append({"role": "assistant", "text": full_response})
             
             else:
                 agent = build_agent(google_api_key, groq_api_key, pollinations_token, tavily_api_key)
                 
+                # Run the async function to get the final answer and the detailed trace
                 final_response, trace_steps, tool_used_key = asyncio.run(run_agent_and_capture_trajectory(agent, prompt))
 
+                # Store the structured trace for the debug view
                 st.session_state.trajectory.append({"prompt": prompt, "steps": trace_steps})
 
-                # --- UPDATE 5: New display logic for Code Reviewer ---
+                # --- Display the final response (logic is unchanged) ---
                 if isinstance(final_response, str):
                     st.markdown(final_response)
                     st.session_state.messages.append({"role": "assistant", "text": final_response})
-                
                 elif isinstance(final_response, dict) and "image" in final_response:
                     img_data = final_response["image"]
                     buf = BytesIO()
@@ -332,41 +299,12 @@ if prompt := st.chat_input("Ask about the latest news, create an image, or query
                         "role": "assistant", "image_bytes": byte_im, "text": f"Image generated for: *{prompt}*",
                         "caption": final_response.get("caption", prompt)
                     })
-                
-                elif isinstance(final_response, dict) and "score" in final_response:
-                    # This is a Code Review response
-                    score = final_response.get('score', 0)
-                    feedback = final_response.get('feedback', 'No feedback provided.')
-                    errors = final_response.get('errors', [])
-                    corrected_code = final_response.get('corrected_code', '# No code returned.')
-
-                    st.metric(label="Code Review Score", value=f"{score} / 100")
-                    
-                    with st.expander("Detailed Feedback & Errors", expanded=True):
-                        st.markdown(feedback)
-                        if errors:
-                            st.error("Errors Found:")
-                            for error in errors:
-                                st.markdown(f"- `{error}`")
-                    
-                    st.markdown("**Corrected Code:**")
-                    st.code(corrected_code, language="python")
-                    
-                    # Create a text-based version for chat history
-                    text_response = (
-                        f"**Code Review Score: {score}/100**\n\n"
-                        f"**Feedback:**\n{feedback}\n\n"
-                        f"**Errors:**\n- {'- '.join(errors) if errors else 'None'}\n\n"
-                        f"**Corrected Code:**\n```python\n{corrected_code}\n```"
-                    )
-                    st.session_state.messages.append({"role": "assistant", "text": text_response})
-
                 else:
                     error_message = final_response.get("error", "Sorry, something went wrong.")
                     st.markdown(f"Error: {error_message}")
                     st.session_state.messages.append({"role": "assistant", "text": f"Error: {error_message}"})
             
-            # --- Metrics Recording (This logic is dynamic and needs no change) ---
+            # --- Metrics Recording (logic is unchanged) ---
             end_time = time.time()
             latency = end_time - start_time
             metrics = st.session_state.metrics
@@ -382,21 +320,25 @@ if prompt := st.chat_input("Ask about the latest news, create an image, or query
             
             st.rerun()
 
-# --- Agent Trajectory / Debug View ---
+# --- MODIFIED: Display the detailed Agent Trajectory / Debug View ---
+# --- THIS IS THE NEW, ROBUST CODE ---
 if st.session_state.trajectory:
     with st.expander("🕵️ Agent Trajectory / Debug View", expanded=False):
         for run in reversed(st.session_state.trajectory):
             st.markdown(f"#### Prompt: *'{run.get('prompt', 'N/A')}'*")
             
+            # Safely get the 'steps' list, defaulting to an empty list if it doesn't exist
             steps = run.get('steps', [])
             
             for step in steps:
                 st.markdown(f"##### 🎬 Step: `{step.get('name', 'Unknown Step')}`")
                 
+                # Display Input
                 with st.container(border=True):
                     st.markdown("**Input:**")
                     st.markdown(pretty_print_dict(step.get('input', {})), unsafe_allow_html=True)
                 
+                # Display Output
                 with st.container(border=True):
                     st.markdown("**Output:**")
                     st.markdown(pretty_print_dict(step.get('output', {})), unsafe_allow_html=True)
@@ -404,7 +346,7 @@ if st.session_state.trajectory:
             st.markdown("---")
 
 
-# --- Feedback buttons logic ---
+# --- Feedback buttons logic (Unchanged) ---
 if st.session_state.messages and st.session_state.messages[-1]["role"] == "assistant":
     message_id = len(st.session_state.messages) - 1
 
@@ -423,4 +365,3 @@ if st.session_state.messages and st.session_state.messages[-1]["role"] == "assis
             st.toast("Thanks for your feedback!")
             time.sleep(1)
             st.rerun()
-
