@@ -12,6 +12,7 @@ An advanced multi-tool AI agent built with Streamlit and LangGraph. This interac
 ## ✨ Features
 
 -   **🤖 Agentic Router:** A central LangGraph agent that intelligently routes user queries to the most appropriate tool.
+-   **Interactive Debugging:** Integrated AGDebugger to provide a visual, interactive dashboard for monitoring, stepping through, and debugging the LangGraph agent's workflow and internal decisions.
 -   **🌐 Real-Time Web Search:** Utilizes the Tavily API to fetch current information from the internet and provides summarized, relevant answers.
 -   **🎨 AI Image Generation:** Integrates with the Pollinations AI API to generate images from user prompts, first enhancing the prompts with Gemini for more artistic results.
 -   **⚖️ Dual-Model Comparison & Evaluation:** A unique tool that runs the same query on both **Google's Gemini 2.5 Flash** and a model via the **Groq API** (Llama 3.1 or GPT-OSS). A "Judge" LLM then evaluates both responses to determine the winner.
