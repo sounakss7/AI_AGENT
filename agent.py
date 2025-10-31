@@ -101,7 +101,7 @@ def image_generation_tool(prompt: str, google_api_key: str, pollinations_token: 
         
         url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?token={pollinations_token}"
         
-        # --- FIX 2: Add a timeout to prevent the app from freezing ---
+        # --- FIX 2: MODIFIED - Increased timeout to 60 seconds ---
         response = requests.get(url, timeout=60)
         
         # --- FIX 3: Check if the request was successful before processing ---
@@ -116,6 +116,12 @@ def image_generation_tool(prompt: str, google_api_key: str, pollinations_token: 
     except requests.exceptions.HTTPError as http_err:
         logging.error(f"HTTP error occurred: {http_err} - Response: {response.text}")
         return {"error": f"The image generation service returned an error: {http_err}"}
+    
+    # --- NEW: Catch ReadTimeout specifically to give a better error message ---
+    except requests.exceptions.ReadTimeout as timeout_err:
+        logging.error(f"Image generation timed out: {timeout_err}")
+        return {"error": "The image generation service timed out (took longer than 60s). It might be very busy. Please try again in a moment."}
+    
     except Exception as e:
         logging.error(f"An unexpected error occurred in image generation: {e}")
         return {"error": f"Failed to generate image: {e}"}
