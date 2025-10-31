@@ -401,4 +401,4 @@ if st.session_state.messages and st.session_state.messages[-1]["role"] == "assis
             st.session_state[f"feedback_{message_id}"] = "given"
             st.toast("Thanks for your feedback!")
             time.sleep(1)
-            st.rerun() . 
+            st.rerun() 
