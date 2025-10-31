@@ -10,7 +10,7 @@ from langgraph.graph import StateGraph, END
 import concurrent.futures
 from functools import partial
 from tavily import TavilyClient
-from urllib.parse import quote_plus # --- NEW IMPORT ---
+from urllib.parse import quote_plus
 import logging
 
 # =======================================================================================
@@ -96,18 +96,14 @@ def image_generation_tool(prompt: str, google_api_key: str, pollinations_token: 
         enhancer_prompt = f"Rewrite this short prompt into a detailed, vibrant, and artistic image generation description: {prompt}"
         final_prompt = enhancer_llm.invoke(enhancer_prompt).content.strip()
         
-        # --- FIX 1: URL Encode the prompt to handle special characters ---
         encoded_prompt = quote_plus(final_prompt)
         
         url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?token={pollinations_token}"
         
-        # --- FIX 2: MODIFIED - Increased timeout to 60 seconds ---
-        response = requests.get(url, timeout=60)
+        response = requests.get(url, timeout=60) # Increased timeout
         
-        # --- FIX 3: Check if the request was successful before processing ---
         response.raise_for_status()  # This will raise an error for bad status codes (4xx or 5xx)
         
-        # If the above line passes, we know we have a valid response
         img_bytes = response.content
         img = Image.open(BytesIO(img_bytes))
         
@@ -115,16 +111,16 @@ def image_generation_tool(prompt: str, google_api_key: str, pollinations_token: 
 
     except requests.exceptions.HTTPError as http_err:
         logging.error(f"HTTP error occurred: {http_err} - Response: {response.text}")
-        return {"error": f"The image generation service returned an error: {http_err}"}
+        return {"error": f"The image generation service returned an HTTP error: {http_err}. Check Pollinations.ai status."}
     
-    # --- NEW: Catch ReadTimeout specifically to give a better error message ---
     except requests.exceptions.ReadTimeout as timeout_err:
         logging.error(f"Image generation timed out: {timeout_err}")
-        return {"error": "The image generation service timed out (took longer than 60s). It might be very busy. Please try again in a moment."}
+        return {"error": "The image generation service timed out (took longer than 60s). It might be very busy or the prompt is too complex. Please try again with a simpler prompt or wait a moment."}
     
     except Exception as e:
         logging.error(f"An unexpected error occurred in image generation: {e}")
-        return {"error": f"Failed to generate image: {e}"}
+        return {"error": f"Failed to generate image: {e}. Please check your API keys and Pollinations.ai service."}
+
 # ===================================================================
 # TOOL 3: FILE ANALYSIS TOOL (Streams output)
 # ===================================================================
@@ -209,6 +205,7 @@ class AgentState(TypedDict):
     query: str
     route: str  # Add this key to store the router's decision
     final_response: Optional[any]
+
 # These are wrapper functions for the nodes to handle passing state and API keys
 def call_comparison_tool(state: AgentState, google_api_key: str, groq_api_key: str):
     response = comparison_and_evaluation_tool(state['query'], google_api_key, groq_api_key)
@@ -217,6 +214,7 @@ def call_comparison_tool(state: AgentState, google_api_key: str, groq_api_key: s
 def call_image_tool(state: AgentState, google_api_key: str, pollinations_token: str):
     response = image_generation_tool(state['query'], google_api_key, pollinations_token)
     return {"final_response": response}
+
 def call_web_search_tool(state: AgentState, tavily_api_key: str, google_api_key: str):
     response = web_search_tool(state['query'], tavily_api_key, google_api_key)
     return {"final_response": response}
@@ -247,6 +245,7 @@ def router(state: AgentState, google_api_key: str):
     else:
         print("---AGENT: Decision -> Comparison & Evaluation Tool---")
         return {"route": "comparison_chat"}
+
 # --- Define the Agentic Graph ---
 def build_agent(google_api_key: str, groq_api_key: str, pollinations_token: str , tavily_api_key: str ):
     workflow = StateGraph(AgentState)
