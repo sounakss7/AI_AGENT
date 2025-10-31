@@ -22,6 +22,8 @@ from agent import build_agent, file_analysis_tool
 # --- NEW: A helper function to generate audio in memory ---
 def generate_audio_from_text(text: str) -> bytes | None:
     """Generates MP3 audio from text and returns it as bytes."""
+    # Clean text to remove markdown for better speech
+    text = re.sub(r'(\*\*|##|###|####|`|```)', '', text)
     if not text or not text.strip():
         return None
     try:
@@ -116,7 +118,7 @@ with st.sidebar:
     if st.button("Search"):
         if search_query:
             encoded_query = quote_plus(search_query)
-            search_url = f"https://www.google.com/search?q={encoded_query}"
+            search_url = f"[https://www.google.com/search?q=](https://www.google.com/search?q=){encoded_query}"
             st.markdown(f'<a href="{search_url}" target="_blank">Open Google search results</a>', unsafe_allow_html=True)
         else:
             st.warning("Please enter a search query.")
@@ -180,7 +182,7 @@ with st.sidebar:
 
 
 # ===================================================================
-# --- MODIFIED: Main Chat Display Logic with Audio Player ---
+# --- MODIFIED: Main Chat Display Logic with On-Demand Audio Button ---
 # ===================================================================
 for i, message in enumerate(st.session_state.messages):
     with st.chat_message(message["role"]):
@@ -188,12 +190,28 @@ for i, message in enumerate(st.session_state.messages):
         if "text" in message:
             st.markdown(message["text"])
             
-            # --- NEW: Display audio player if audio bytes exist ---
-            if "audio_bytes" in message and message["audio_bytes"]:
-                st.audio(message["audio_bytes"], format="audio/mp3")
-
-            # --- MODIFIED: Add copy button ---
+            # --- NEW: On-Demand Audio Logic ---
             if message["role"] == "assistant":
+                audio_bytes = message.get("audio_bytes")
+                
+                if audio_bytes:
+                    # If audio is generated, show the player
+                    st.audio(audio_bytes, format="audio/mp3")
+                else:
+                    # If no audio, show the "Listen" button
+                    if st.button("🎧 Listen", key=f"listen_btn_{i}"):
+                        with st.spinner("Generating audio..."):
+                            # Generate audio
+                            new_audio_bytes = generate_audio_from_text(message["text"])
+                            if new_audio_bytes:
+                                # Update the message in session state
+                                st.session_state.messages[i]["audio_bytes"] = new_audio_bytes
+                                # Rerun to display the audio player
+                                st.rerun()
+                            else:
+                                st.error("Could not generate audio.")
+
+                # Add the copy button
                 create_copy_button(message["text"], button_key=f"text_copy_{i}")
 
         # --- Display Image with a Download Button ---
@@ -263,7 +281,7 @@ def pretty_print_dict(d):
 
 
 # =================================================================================
-# --- MODIFIED: Main Chat Input Logic (To generate and display audio) ---
+# --- MODIFIED: Main Chat Input Logic (REMOVED automatic audio generation) ---
 # =================================================================================
 if prompt := st.chat_input("Ask about the latest news, create an image, or query a file..."):
     st.session_state.messages.append({"role": "user", "text": prompt})
@@ -272,9 +290,6 @@ if prompt := st.chat_input("Ask about the latest news, create an image, or query
         with st.spinner("Agent is working..."):
             start_time = time.time()
             tool_used_key = ""
-            
-            # --- NEW: Initialize audio_bytes to None ---
-            audio_bytes = None
 
             if uploaded_file:
                 # --- This is the File Analysis Path ---
@@ -297,12 +312,8 @@ if prompt := st.chat_input("Ask about the latest news, create an image, or query
                 response_stream = file_analysis_tool(prompt, file_text, google_api_key)
                 full_response = st.write_stream(response_stream)
                 
-                # --- NEW: Generate audio from the full streamed response ---
-                audio_bytes = generate_audio_from_text(full_response)
-                if audio_bytes:
-                    st.audio(audio_bytes, format="audio/mp3")
-                    
-                st.session_state.messages.append({"role": "assistant", "text": full_response, "audio_bytes": audio_bytes})
+                # --- MODIFIED: Store None for audio, it will be generated on-demand ---
+                st.session_state.messages.append({"role": "assistant", "text": full_response, "audio_bytes": None})
             
             else:
                 # --- This is the Agent Path ---
@@ -313,11 +324,8 @@ if prompt := st.chat_input("Ask about the latest news, create an image, or query
 
                 if isinstance(final_response, str):
                     st.markdown(final_response)
-                    # --- NEW: Generate audio and display it ---
-                    audio_bytes = generate_audio_from_text(final_response)
-                    if audio_bytes:
-                        st.audio(audio_bytes, format="audio/mp3")
-                    st.session_state.messages.append({"role": "assistant", "text": final_response, "audio_bytes": audio_bytes})
+                    # --- MODIFIED: Store None for audio ---
+                    st.session_state.messages.append({"role": "assistant", "text": final_response, "audio_bytes": None})
                 
                 elif isinstance(final_response, dict) and "image" in final_response:
                     img_data = final_response["image"]
@@ -334,13 +342,11 @@ if prompt := st.chat_input("Ask about the latest news, create an image, or query
                 else:
                     error_message = final_response.get("error", "Sorry, something went wrong.")
                     st.markdown(f"Error: {error_message}")
-                    # --- NEW: Generate audio for the error message ---
-                    audio_bytes = generate_audio_from_text(error_message)
-                    if audio_bytes:
-                        st.audio(audio_bytes, format="audio/mp3")
-                    st.session_state.messages.append({"role": "assistant", "text": f"Error: {error_message}", "audio_bytes": audio_bytes})
+                    # --- MODIFIED: Store None for audio ---
+                    st.session_state.messages.append({"role": "assistant", "text": f"Error: {error_message}", "audio_bytes": None})
             
             # --- Metrics Recording (logic is unchanged) ---
+            # This timer now stops *before* any audio is generated, giving an accurate latency.
             end_time = time.time()
             latency = end_time - start_time
             metrics = st.session_state.metrics
