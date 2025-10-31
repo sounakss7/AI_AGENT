@@ -102,7 +102,7 @@ def image_generation_tool(prompt: str, google_api_key: str, pollinations_token: 
         url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?token={pollinations_token}"
         
         # --- FIX 2: Add a timeout to prevent the app from freezing ---
-        response = requests.get(url, timeout=30)
+        response = requests.get(url, timeout=60)
         
         # --- FIX 3: Check if the request was successful before processing ---
         response.raise_for_status()  # This will raise an error for bad status codes (4xx or 5xx)
