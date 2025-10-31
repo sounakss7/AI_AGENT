@@ -13,6 +13,7 @@ An advanced multi-tool AI agent built with Streamlit and LangGraph. This interac
 
 -   **🤖 Agentic Router:** A central LangGraph agent that intelligently routes user queries to the most appropriate tool.
 -   **Interactive Debugging:** Integrated AGDebugger to provide a visual, interactive dashboard for monitoring, stepping through, and debugging the LangGraph agent's workflow and internal decisions.
+-   * **🎧 On-Demand Audio (TTS):** Converts the agent's text responses into speech. Users can click a "Listen" button to generate and play the audio, powered by `gTTS`.
 -   **🌐 Real-Time Web Search:** Utilizes the Tavily API to fetch current information from the internet and provides summarized, relevant answers.
 -   **🎨 AI Image Generation:** Integrates with the Pollinations AI API to generate images from user prompts, first enhancing the prompts with Gemini for more artistic results.
 -   **⚖️ Dual-Model Comparison & Evaluation:** A unique tool that runs the same query on both **Google's Gemini 2.5 Flash** and a model via the **Groq API** (Llama 3.1 or GPT-OSS). A "Judge" LLM then evaluates both responses to determine the winner.
@@ -36,7 +37,7 @@ The application operates on two primary workflows, determined by whether a file 
 -   **Frontend:** [Streamlit](https://streamlit.io/)
 -   **AI Orchestration:** [LangChain](https://www.langchain.com/) & [LangGraph](https://langchain-ai.github.io/langgraph/)
 -   **Language:** Python
--   **Core Libraries:** Pandas, Pillow, PyPDF2, PyMuPDF (fitz), Pytesseract
+-   **Core Libraries:** Pandas, Pillow, PyPDF2, PyMuPDF (fitz), Pytesseract ,**gTTS**
 -   **APIs & Services:**
     -   **LLMs:** Google Gemini, Groq API (Llama, OpenAI models)
     -   **Web Search:** Tavily AI
