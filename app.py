@@ -11,10 +11,29 @@ import pandas as pd
 import random
 from urllib.parse import quote_plus
 import asyncio
-import json # --- NEW IMPORT for pretty-printing dictionaries ---
+import json
 
-# Import the agent logic (no changes needed in agent.py)
+# --- NEW: Import gTTS ---
+from gtts import gTTS
+
+# Import the agent logic
 from agent import build_agent, file_analysis_tool
+
+# --- NEW: A helper function to generate audio in memory ---
+def generate_audio_from_text(text: str) -> bytes | None:
+    """Generates MP3 audio from text and returns it as bytes."""
+    if not text or not text.strip():
+        return None
+    try:
+        audio_fp = BytesIO()
+        tts = gTTS(text=text, lang='en')
+        tts.write_to_fp(audio_fp)
+        audio_fp.seek(0)
+        return audio_fp.getvalue()
+    except Exception as e:
+        print(f"Error generating TTS audio: {e}")
+        return None
+
 # --- NEW: A custom function to create a copy-to-clipboard button ---
 def create_copy_button(text_to_copy: str, button_key: str):
     """
@@ -159,21 +178,21 @@ with st.sidebar:
     with st.expander("🕵️ See Last Query Details"):
         st.json(metrics["last_query_details"])
 
-# ===============================================
-# Main Chat Display Logic (Unchanged)
-# ===============================================
+
 # ===================================================================
-# --- MODIFIED: Main Chat Display Logic with Copy/Download Buttons ---
-# ===================================================================
-# ===================================================================
-# --- MODIFIED: Main Chat Display Logic with Custom Copy Button ---
+# --- MODIFIED: Main Chat Display Logic with Audio Player ---
 # ===================================================================
 for i, message in enumerate(st.session_state.messages):
     with st.chat_message(message["role"]):
         # --- Display Text Response ---
         if "text" in message:
             st.markdown(message["text"])
-            # --- ADDED: A custom copy button for the assistant's text response ---
+            
+            # --- NEW: Display audio player if audio bytes exist ---
+            if "audio_bytes" in message and message["audio_bytes"]:
+                st.audio(message["audio_bytes"], format="audio/mp3")
+
+            # --- MODIFIED: Add copy button ---
             if message["role"] == "assistant":
                 create_copy_button(message["text"], button_key=f"text_copy_{i}")
 
@@ -189,11 +208,10 @@ for i, message in enumerate(st.session_state.messages):
                 mime="image/png",
                 key=f"download_btn_{i}"
             )
-# =================================================================================
-# --- MODIFIED: AGDebugger Logic with More Detailed Tracing ---
-# =================================================================================
 
-# --- MODIFIED: This function now captures much more detail ---
+# =================================================================================
+# --- AGDebugger Logic (Unchanged) ---
+# =================================================================================
 async def run_agent_and_capture_trajectory(agent, prompt):
     """
     Runs the agent using astream_events and captures a detailed trace of its execution,
@@ -232,20 +250,21 @@ async def run_agent_and_capture_trajectory(agent, prompt):
 
     return final_response, trace_steps, tool_used
 
-# --- NEW: Helper function to pretty-print dictionaries, handling non-serializable objects ---
 def pretty_print_dict(d):
     def safe_converter(o):
         if isinstance(o, (Image.Image, bytes)):
             return f"<{type(o).__name__} object>"
         return str(o)
     
-    # Check if the object is a dict before trying to dump it
     if not isinstance(d, dict):
         return f"```\n{str(d)}\n```"
         
     return "```json\n" + json.dumps(d, indent=2, default=safe_converter) + "\n```"
 
 
+# =================================================================================
+# --- MODIFIED: Main Chat Input Logic (To generate and display audio) ---
+# =================================================================================
 if prompt := st.chat_input("Ask about the latest news, create an image, or query a file..."):
     st.session_state.messages.append({"role": "user", "text": prompt})
     
@@ -253,9 +272,12 @@ if prompt := st.chat_input("Ask about the latest news, create an image, or query
         with st.spinner("Agent is working..."):
             start_time = time.time()
             tool_used_key = ""
+            
+            # --- NEW: Initialize audio_bytes to None ---
+            audio_bytes = None
 
             if uploaded_file:
-                # File Analysis logic remains separate
+                # --- This is the File Analysis Path ---
                 tool_used_key = "File Analysis"
                 file_bytes = uploaded_file.read()
                 file_text = ""
@@ -274,21 +296,29 @@ if prompt := st.chat_input("Ask about the latest news, create an image, or query
                 
                 response_stream = file_analysis_tool(prompt, file_text, google_api_key)
                 full_response = st.write_stream(response_stream)
-                st.session_state.messages.append({"role": "assistant", "text": full_response})
+                
+                # --- NEW: Generate audio from the full streamed response ---
+                audio_bytes = generate_audio_from_text(full_response)
+                if audio_bytes:
+                    st.audio(audio_bytes, format="audio/mp3")
+                    
+                st.session_state.messages.append({"role": "assistant", "text": full_response, "audio_bytes": audio_bytes})
             
             else:
+                # --- This is the Agent Path ---
                 agent = build_agent(google_api_key, groq_api_key, pollinations_token, tavily_api_key)
                 
-                # Run the async function to get the final answer and the detailed trace
                 final_response, trace_steps, tool_used_key = asyncio.run(run_agent_and_capture_trajectory(agent, prompt))
-
-                # Store the structured trace for the debug view
                 st.session_state.trajectory.append({"prompt": prompt, "steps": trace_steps})
 
-                # --- Display the final response (logic is unchanged) ---
                 if isinstance(final_response, str):
                     st.markdown(final_response)
-                    st.session_state.messages.append({"role": "assistant", "text": final_response})
+                    # --- NEW: Generate audio and display it ---
+                    audio_bytes = generate_audio_from_text(final_response)
+                    if audio_bytes:
+                        st.audio(audio_bytes, format="audio/mp3")
+                    st.session_state.messages.append({"role": "assistant", "text": final_response, "audio_bytes": audio_bytes})
+                
                 elif isinstance(final_response, dict) and "image" in final_response:
                     img_data = final_response["image"]
                     buf = BytesIO()
@@ -298,11 +328,17 @@ if prompt := st.chat_input("Ask about the latest news, create an image, or query
                     st.session_state.messages.append({
                         "role": "assistant", "image_bytes": byte_im, "text": f"Image generated for: *{prompt}*",
                         "caption": final_response.get("caption", prompt)
+                        # No audio for image-only responses
                     })
+                
                 else:
                     error_message = final_response.get("error", "Sorry, something went wrong.")
                     st.markdown(f"Error: {error_message}")
-                    st.session_state.messages.append({"role": "assistant", "text": f"Error: {error_message}"})
+                    # --- NEW: Generate audio for the error message ---
+                    audio_bytes = generate_audio_from_text(error_message)
+                    if audio_bytes:
+                        st.audio(audio_bytes, format="audio/mp3")
+                    st.session_state.messages.append({"role": "assistant", "text": f"Error: {error_message}", "audio_bytes": audio_bytes})
             
             # --- Metrics Recording (logic is unchanged) ---
             end_time = time.time()
@@ -320,31 +356,26 @@ if prompt := st.chat_input("Ask about the latest news, create an image, or query
             
             st.rerun()
 
-# --- MODIFIED: Display the detailed Agent Trajectory / Debug View ---
-# --- THIS IS THE NEW, ROBUST CODE ---
+# --- MODIFIED: Debug View (Unchanged from your version) ---
 if st.session_state.trajectory:
     with st.expander("🕵️ Agent Trajectory / Debug View", expanded=False):
         for run in reversed(st.session_state.trajectory):
             st.markdown(f"#### Prompt: *'{run.get('prompt', 'N/A')}'*")
             
-            # Safely get the 'steps' list, defaulting to an empty list if it doesn't exist
             steps = run.get('steps', [])
             
             for step in steps:
                 st.markdown(f"##### 🎬 Step: `{step.get('name', 'Unknown Step')}`")
                 
-                # Display Input
                 with st.container(border=True):
                     st.markdown("**Input:**")
                     st.markdown(pretty_print_dict(step.get('input', {})), unsafe_allow_html=True)
                 
-                # Display Output
                 with st.container(border=True):
                     st.markdown("**Output:**")
                     st.markdown(pretty_print_dict(step.get('output', {})), unsafe_allow_html=True)
-                
+            
             st.markdown("---")
-
 
 # --- Feedback buttons logic (Unchanged) ---
 if st.session_state.messages and st.session_state.messages[-1]["role"] == "assistant":
