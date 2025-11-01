@@ -32,7 +32,7 @@ def query_groq(prompt: str, groq_api_key: str):
         resp = requests.post("https://api.groq.com/openai/v1/chat/completions", json=data, headers=headers)
         if resp.status_code == 200:
             content = resp.json()["choices"][0]["message"]["content"]
-            return f"**Model:** {model}\n\n{content}"
+            return f"#### Model: {model}\n\n{content}"
         return f"❌ Groq API Error: {resp.text}"
     except Exception as e:
         return f"⚠️ Groq Error: {e}"
@@ -76,12 +76,12 @@ def comparison_and_evaluation_tool(query: str, google_api_key: str, groq_api_key
     
     chosen_answer = gemini_response if winner == "Gemini" else groq_response
     
-    final_output = f"## 🏆 Judged Best Answer ({winner})\n"
+    final_output = f"### 🏆 Judged Best Answer ({winner})\n"
     final_output += f"{chosen_answer}\n\n"
     final_output += f"### 🧠 Judge's Evaluation\n{judgment}\n\n---\n\n"
     final_output += f"### Other Responses\n\n"
-    final_output += f"**🤖 Gemini's Full Response:**\n{gemini_response}\n\n"
-    final_output += f"**⚡ Groq's Full Response:**\n{groq_response}"
+    final_output += f"###🤖 Gemini's Full Response:**\n{gemini_response}\n\n"
+    final_output += f"###⚡ Groq's Full Response:**\n{groq_response}"
     
     return final_output
 
