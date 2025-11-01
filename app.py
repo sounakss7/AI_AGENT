@@ -99,7 +99,7 @@ def set_bg_hack(url):
 st.set_page_config(page_title="🤖 AI Agent Workshop", page_icon="🧠", layout="wide")
 
 # --- NEW: CALL THE BACKGROUND FUNCTION ---
-image_url = "[https://blocksandfiles.com/wp-content/uploads/2025/06/shutterstock_2477473881.jpg](https://blocksandfiles.com/wp-content/uploads/2025/06/shutterstock_2477473881.jpg)"
+image_url = "(https://blocksandfiles.com/wp-content/uploads/2025/06/shutterstock_2477473881.jpg)"
 set_bg_hack(image_url)
 # ------------------------------------------
 
