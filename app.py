@@ -73,10 +73,35 @@ def create_copy_button(text_to_copy: str, button_key: str):
     # Combine and render using st.components.v1.html
     st.components.v1.html(html_code + js_code, height=50)
 
+# =======================================================
+# --- NEW: FUNCTION TO SET BACKGROUND IMAGE ---
+# =======================================================
+def set_bg_hack(url):
+    '''
+    A function to unpack an image from url and set as bg.
+    '''
+    st.markdown(
+         f"""
+         <style>
+         .stApp {{
+             background: url("{url}");
+             background-size: cover;
+         }}
+         </style>
+         """,
+         unsafe_allow_html=True
+     )
+# =======================================================
+
 # =====================
 # Page Config and Setup
 # =====================
 st.set_page_config(page_title="🤖 AI Agent Workshop", page_icon="🧠", layout="wide")
+
+# --- NEW: CALL THE BACKGROUND FUNCTION ---
+image_url = "[https://blocksandfiles.com/wp-content/uploads/2025/06/shutterstock_2477473881.jpg](https://blocksandfiles.com/wp-content/uploads/2025/06/shutterstock_2477473881.jpg)"
+set_bg_hack(image_url)
+# ------------------------------------------
 
 # --- Securely load API keys from Streamlit Secrets ---
 try:
