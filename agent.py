@@ -68,6 +68,7 @@ def comparison_and_evaluation_tool(query: str, google_api_key: str, groq_api_key
     Instructions:
     1. Begin with "Winner: Gemini" or "Winner: Groq".
     2. Explain your reasoning clearly, comparing accuracy, clarity, and completeness.
+    3. **Evaluate the responses purely on their merit for the given query. Do not show bias towards any model provider. Your judgment must be neutral and unbiased.**
     """
     judgment = judge_llm.invoke(judge_prompt).content
     
