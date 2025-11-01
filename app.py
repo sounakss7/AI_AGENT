@@ -78,7 +78,7 @@ def create_copy_button(text_to_copy: str, button_key: str):
 # =======================================================
 def set_animated_fluid_background():
     """
-    Sets a "Fluid Nebula" animated background - (Deep Purple & Blue theme)
+    Sets a "Fluid Nebula" animated background - (Deep Blue & Purple theme)
     """
     # NOTE: The "f" from f"""...""" has been removed to fix a SyntaxError
     st.markdown(
@@ -93,8 +93,8 @@ def set_animated_fluid_background():
          }
 
          .stApp {
-             /* --- THIS IS YOUR NEW GRADIENT --- */
-             background: linear-gradient(45deg, #0a0c27, #30015a, #0052D4, #6a0dad);
+             /* --- THIS IS YOUR NEW DEEP BLUE GRADIENT --- */
+             background: linear-gradient(45deg, #0a0c27, #001f5a, #4a0d6a, #0052D4);
              background-size: 300% 300%;
              animation: fluidMove 20s ease infinite;
              color: #ffffff;
@@ -109,8 +109,8 @@ def set_animated_fluid_background():
              background-color: rgba(10, 12, 39, 0.8);
          }
          [data-testid="chat-message-container"] {
-             /* Chat bubbles are now tinted deep purple */
-             background-color: rgba(48, 1, 90, 0.7);
+             /* Chat bubbles are now tinted deep blue */
+             background-color: rgba(0, 31, 90, 0.7);
              border-radius: 10px;
              padding: 10px !important;
              margin-bottom: 10px;
