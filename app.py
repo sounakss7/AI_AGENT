@@ -76,51 +76,19 @@ def create_copy_button(text_to_copy: str, button_key: str):
 # =======================================================
 # --- NEW: FUNCTION TO SET ANIMATED GRADIENT BG ---
 # =======================================================
-import streamlit.components.v1 as components
-import streamlit as st
-import streamlit.components.v1 as components
+import streamlit.components.v1 as componeimport streamlit as st
 
-def set_vanta_background_robust():
+def set_vanta_background_final():
     """
-    Sets a Vanta.js animated background using a robust, fixed-position div.
-    This is more reliable for deployed Streamlit apps.
+    This is the most reliable method.
+    It injects ALL HTML, CSS, and JS into the main app's
+    markdown, not a sandboxed component iframe.
     """
     
-    # Define the HTML/JS for Vanta
-    # We create a new div "vanta-bg" that will hold our animation
-    vanta_html = """
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.dots.min.js"></script>
-    
-    <div id="vanta-bg"></div>
-
-    <script>
-    // Wait for Vanta to load, then initialize
-    document.addEventListener("DOMContentLoaded", function() {
-        VANTA.DOTS({
-            el: "#vanta-bg", // Target our new div
-            mouseControls: true,
-            touchControls: true,
-            gyroControls: false,
-            minHeight: 200.00,
-            minWidth: 200.00,
-            scale: 1.00,
-            scaleMobile: 1.00,
-            color: 0x3f8eff,
-            color2: 0xffffff,
-            backgroundColor: 0x0a0c27, // This will be the Vanta canvas color
-            size: 3.50,
-            spacing: 35.00
-        });
-    });
-    </script>
-    """
-
-    # Define the CSS to:
-    # 1. Make the "vanta-bg" div a fullscreen, fixed background (z-index: -1)
-    # 2. Make the main Streamlit app background TRANSPARENT
-    vanta_css = """
+    # We combine all our code into one giant string
+    vanta_all_in_one = """
     <style>
+    /* 1. Create the fixed background div */
     #vanta-bg {
         position: fixed;   /* Fix it to the viewport */
         top: 0;
@@ -130,13 +98,13 @@ def set_vanta_background_robust():
         z-index: -1;       /* Sit behind all other content */
     }
 
-    /* Make the main Streamlit background transparent so we can see Vanta */
+    /* 2. Make the Streamlit app transparent */
     .stApp {
         background-color: transparent !important;
         color: #ffffff; /* Set default text to white */
     }
 
-    /* Your other component styles */
+    /* 3. Style other components for visibility */
     [data-testid="stSidebar"] > div:first-child {
         background-color: rgba(10, 12, 39, 0.8);
     }
@@ -150,20 +118,44 @@ def set_vanta_background_robust():
         margin-bottom: 10px;
     }
     </style>
-    """
 
-    # Inject the CSS first
-    st.markdown(vanta_css, unsafe_allow_html=True)
+    <div id="vanta-bg"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.dots.min.js"></script>
+
+    <script>
+    document.addEventListener("DOMContentLoaded", function() {
+        // Check if Vanta is loaded
+        if (window.VANTA) {
+            VANTA.DOTS({
+                el: "#vanta-bg", // Target our new div
+                mouseControls: true,
+                touchControls: true,
+                gyroControls: false,
+                minHeight: 200.00,
+                minWidth: 200.00,
+                scale: 1.00,
+                scaleMobile: 1.00,
+                color: 0x3f8eff,
+                color2: 0xffffff,
+                backgroundColor: 0x0a0c27,
+                size: 3.50,
+                spacing: 35.00
+            });
+        }
+    });
+    </script>
+    """
     
-    # Inject the HTML (with scripts and the div)
-    # Use height=0 to make the Streamlit component container invisible
-    components.html(vanta_html, height=0)
+    # Inject the entire HTML block into the app
+    st.markdown(vanta_all_in_one, unsafe_allow_html=True)
 # =======================================================
 # =====================
 # Page Config and Setup
 # =====================
 st.set_page_config(page_title="🤖 AI Agent Workshop", page_icon="🧠", layout="wide")
-set_vanta_background_robust()
+set_vanta_background_final()
 # --- Securely load API keys from Streamlit Secrets ---
 try:
     google_api_key = st.secrets["GOOGLE_API_KEY"]
