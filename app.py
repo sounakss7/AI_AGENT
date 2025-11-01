@@ -75,43 +75,41 @@ def create_copy_button(text_to_copy: str, button_key: str):
 # =======================================================
 # --- NEW: FUNCTION TO SET ANIMATED GRADIENT BG ---
 # =======================================================
-def set_animated_gradient_background():
+def set_animated_fluid_background():
     """
-    Sets a professional, animated gradient as the app's background.
+    Sets a "Fluid Nebula" animated background.
     """
     st.markdown(
          f"""
          <style>
-         @keyframes gradientMove {{
+         @keyframes fluidMove {{
              0% {{ background-position: 0% 50%; }}
-             50% {{ background-position: 100% 50%; }}
+             25% {{ background-position: 100% 50%; }}
+             50% {{ background-position: 100% 100%; }}
+             75% {{ background-position: 0% 100%; }}
              100% {{ background-position: 0% 50%; }}
          }}
 
          .stApp {{
-             background: linear-gradient(-45deg, #0a0c27, #2d2d5a, #004d40, #23a6d5);
-             background-size: 400% 400%;
-             animation: gradientMove 15s ease infinite;
-             color: #ffffff; /* Set default text color to white for readability */
-         }}
-
-         /* Make sidebar and other elements semi-transparent */
-         [data-testid="stSidebar"] > div:first-child {{
-             background-color: rgba(10, 12, 39, 0.8); /* Semi-transparent dark blue */
-         }}
-
-         .st-emotion-cache-16txtl3 {{
-             background-color: rgba(10, 12, 39, 0.8); /* Match sidebar for consistency */
+             background: linear-gradient(45deg, #0a0c27, #004d40, #23a6d5, #2d2d5a);
+             background-size: 300% 300%;
+             animation: fluidMove 20s ease infinite;
+             color: #ffffff;
          }}
          
-         /* Improve chat message visibility */
+         /* --- Common Component Styling (for all options) --- */
+         [data-testid="stSidebar"] > div:first-child {{
+             background-color: rgba(10, 12, 39, 0.8); /* Semi-transparent dark base */
+         }}
+         .st-emotion-cache-16txtl3 {{
+             background-color: rgba(10, 12, 39, 0.8);
+         }}
          [data-testid="chat-message-container"] {{
              background-color: rgba(45, 45, 90, 0.7);
              border-radius: 10px;
              padding: 10px !important;
              margin-bottom: 10px;
          }}
-         
          </style>
          """,
          unsafe_allow_html=True
@@ -121,7 +119,7 @@ def set_animated_gradient_background():
 # Page Config and Setup
 # =====================
 st.set_page_config(page_title="🤖 AI Agent Workshop", page_icon="🧠", layout="wide")
-set_animated_gradient_background()
+set_animated_fluid_background()
 # --- Securely load API keys from Streamlit Secrets ---
 try:
     google_api_key = st.secrets["GOOGLE_API_KEY"]
