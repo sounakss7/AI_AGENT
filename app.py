@@ -76,8 +76,6 @@ def create_copy_button(text_to_copy: str, button_key: str):
 # =======================================================
 # --- NEW: FUNCTION TO SET ANIMATED GRADIENT BG ---
 # =======================================================
-import streamlit.components.v1 as componeimport streamlit as st
-
 def set_vanta_background_final():
     """
     This is the most reliable method.
