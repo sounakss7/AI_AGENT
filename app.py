@@ -76,84 +76,69 @@ def create_copy_button(text_to_copy: str, button_key: str):
 # =======================================================
 # --- NEW: FUNCTION TO SET ANIMATED GRADIENT BG ---
 # =======================================================
-def set_vanta_background_final():
+def set_celestial_aurora_background():
     """
-    This is the most reliable method.
-    It injects ALL HTML, CSS, and JS into the main app's
-    markdown, not a sandboxed component iframe.
+    Sets a "Celestial Aurora" animated background using 4 layered gradients.
     """
-    
-    # We combine all our code into one giant string
-    vanta_all_in_one = """
-    <style>
-    /* 1. Create the fixed background div */
-    #vanta-bg {
-        position: fixed;   /* Fix it to the viewport */
-        top: 0;
-        left: 0;
-        width: 100vw;      /* Full viewport width */
-        height: 100vh;     /* Full viewport height */
-        z-index: -1;       /* Sit behind all other content */
-    }
-
-    /* 2. Make the Streamlit app transparent */
-    .stApp {
-        background-color: transparent !important;
-        color: #ffffff; /* Set default text to white */
-    }
-
-    /* 3. Style other components for visibility */
-    [data-testid="stSidebar"] > div:first-child {
-        background-color: rgba(10, 12, 39, 0.8);
-    }
-    .st-emotion-cache-16txtl3 {
-        background-color: rgba(10, 12, 39, 0.8);
-    }
-    [data-testid="chat-message-container"] {
-        background-color: rgba(45, 45, 90, 0.7);
-        border-radius: 10px;
-        padding: 10px !important;
-        margin-bottom: 10px;
-    }
-    </style>
-
-    <div id="vanta-bg"></div>
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.dots.min.js"></script>
-
-    <script>
-    document.addEventListener("DOMContentLoaded", function() {
-        // Check if Vanta is loaded
-        if (window.VANTA) {
-            VANTA.DOTS({
-                el: "#vanta-bg", // Target our new div
-                mouseControls: true,
-                touchControls: true,
-                gyroControls: false,
-                minHeight: 200.00,
-                minWidth: 200.00,
-                scale: 1.00,
-                scaleMobile: 1.00,
-                color: 0x3f8eff,
-                color2: 0xffffff,
-                backgroundColor: 0x0a0c27,
-                size: 3.50,
-                spacing: 35.00
-            });
-        }
-    });
-    </script>
-    """
-    
-    # Inject the entire HTML block into the app
-    st.markdown(vanta_all_in_one, unsafe_allow_html=True)
+    st.markdown(
+         f"""
+         <style>
+         @keyframes aurora {
+             0% {{ background-position: 0% 50%; }}
+             25% {{ background-position: 100% 50%; }}
+             50% {{ background-position: 100% 100%; }}
+             75% {{ background-position: 0% 100%; }}
+             100% {{ background-position: 0% 50%; }}
+         }
+         
+         @keyframes aurora2 {
+             0% {{ background-position: 100% 0%; }}
+             100% {{ background-position: 0% 100%; }}
+         }
+         
+         .stApp {{
+             color: #ffffff;
+             background-color: #020122; /* Dark indigo base */
+             
+             /* 4-layer gradient */
+             background-image: 
+                 radial-gradient(ellipse at 70% 30%, #004d40 0%, transparent 70%), 
+                 radial-gradient(ellipse at 30% 70%, #2d2d5a 0%, transparent 70%),
+                 radial-gradient(ellipse at 50% 50%, #23a6d5 0%, transparent 70%),
+                 radial-gradient(ellipse at 90% 80%, #0a0c27 0%, transparent 70%);
+             
+             background-size: 300% 300%, 200% 200%, 150% 150%, 200% 200%;
+             background-position: 0% 0%;
+             
+             /* Animate the layers at different speeds */
+             animation: 
+                 aurora 20s ease infinite,
+                 aurora2 25s ease-in-out infinite alternate;
+         }}
+         
+         /* --- Component Styling --- */
+         [data-testid="stSidebar"] > div:first-child {{
+             background-color: rgba(2, 1, 34, 0.8); /* Semi-transparent indigo base */
+         }}
+         .st-emotion-cache-16txtl3 {{
+             background-color: rgba(2, 1, 34, 0.8);
+         }}
+         [data-testid="chat-message-container"] {{
+             background-color: rgba(45, 45, 90, 0.7);
+             border-radius: 10px;
+             padding: 10px !important;
+             margin-bottom: 10px;
+         }}
+         </style>
+         """,
+         unsafe_allow_html=True
+     )
 # =======================================================
 # =====================
 # Page Config and Setup
 # =====================
 st.set_page_config(page_title="🤖 AI Agent Workshop", page_icon="🧠", layout="wide")
-set_vanta_background_final()
+set_celestial_aurora_background()
 # --- Securely load API keys from Streamlit Secrets ---
 try:
     google_api_key = st.secrets["GOOGLE_API_KEY"]
