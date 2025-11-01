@@ -14,7 +14,7 @@ from urllib.parse import quote_plus
 import logging
 
 # =======================================================================================
-# TOOL 1: THE COMPARISON & EVALUATION WORKFLOW
+# TOOL 1: THE COMPARISON & EVALUATION WORKFLOW (Judged by Mistral)
 # =======================================================================================
 
 def choose_groq_model(prompt: str):
@@ -37,17 +37,36 @@ def query_groq(prompt: str, groq_api_key: str):
     except Exception as e:
         return f"⚠️ Groq Error: {e}"
 
-def comparison_and_evaluation_tool(query: str, google_api_key: str, groq_api_key: str) -> str:
+# --- NEW: Dedicated function to call Mistral for judging ---
+def query_mistral_judge(prompt: str, mistral_api_key: str):
+    """A dedicated function to call Mistral for judging."""
+    # Using a small, fast model for the judging task
+    model = "mistral-small-latest"
+    headers = {"Authorization": f"Bearer {mistral_api_key}", "Content-Type": "application/json"}
+    data = {"model": model, "messages": [{"role": "user", "content": prompt}], "max_tokens": 1024}
+    try:
+        resp = requests.post("https://api.mistral.ai/v1/chat/completions", json=data, headers=headers)
+        resp.raise_for_status() # Raise an error for bad status codes
+        return resp.json()["choices"][0]["message"]["content"]
+    except requests.exceptions.HTTPError as http_err:
+        logging.error(f"Mistral Judge HTTP Error: {http_err} - {resp.text}")
+        return "Error: The Mistral judge failed to provide an evaluation (HTTP error)."
+    except Exception as e:
+        logging.error(f"Mistral Judge Exception: {e}")
+        return f"Error: The Mistral judge ran into an exception: {e}"
+
+# --- MODIFIED: The evaluation tool now uses Mistral as the judge ---
+def comparison_and_evaluation_tool(query: str, google_api_key: str, groq_api_key: str, mistral_api_key: str) -> str:
     """
-    Runs a query through Gemini and Groq, has an AI judge evaluate the best response,
+    Runs a query through Gemini and Groq, has a MISTRAL AI judge evaluate the best response,
     and formats everything into a comprehensive answer.
     """
-    print("---TOOL: Executing the Comparison & Evaluation Workflow---")
+    print("---TOOL: Executing Comparison (Judged by Mistral)---")
     
     # Use the fast model for the head-to-head comparison
     fast_llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=google_api_key)
-    # Use the powerful model for the critical task of judging
-    judge_llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=google_api_key)
+    
+    # The Gemini judge_llm is no longer needed and has been removed.
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
         future_gemini = executor.submit(lambda: fast_llm.invoke(query).content)
@@ -70,7 +89,12 @@ def comparison_and_evaluation_tool(query: str, google_api_key: str, groq_api_key
     2. Explain your reasoning clearly, comparing accuracy, clarity, and completeness.
     3. **Evaluate the responses purely on their merit for the given query. Do not show bias towards any model provider. Your judgment must be neutral and unbiased.**
     """
-    judgment = judge_llm.invoke(judge_prompt).content
+    
+    # --- THIS IS THE KEY CHANGE ---
+    # Use the new Mistral judge function instead of the Gemini judge
+    print("---JUDGE: Calling Mistral for evaluation---")
+    judgment = query_mistral_judge(judge_prompt, mistral_api_key)
+    # --- END OF KEY CHANGE ---
     
     match = re.search(r"winner\s*:\s*(gemini|groq)", judgment, re.IGNORECASE)
     winner = match.group(1).capitalize() if match else "Evaluation"
@@ -79,7 +103,7 @@ def comparison_and_evaluation_tool(query: str, google_api_key: str, groq_api_key
     
     final_output = f"### 🏆 Judged Best Answer ({winner})\n"
     final_output += f"{chosen_answer}\n\n"
-    final_output += f"### 🧠 Judge's Evaluation\n{judgment}\n\n---\n\n"
+    final_output += f"### 🧠 Judge's Evaluation (from Mistral)\n{judgment}\n\n---\n\n"
     final_output += f"### Other Responses\n\n"
     final_output += f"**🤖 Gemini's Full Response:**\n{gemini_response}\n\n"
     final_output += f"**⚡ Groq's Full Response:**\n{groq_response}"
@@ -87,7 +111,7 @@ def comparison_and_evaluation_tool(query: str, google_api_key: str, groq_api_key
     return final_output
 
 # ===================================================================
-# TOOL 2: IMAGE GENERATION TOOL
+# TOOL 2: IMAGE GENERATION TOOL (Unchanged)
 # ===================================================================
 def image_generation_tool(prompt: str, google_api_key: str, pollinations_token: str) -> dict:
     """Use this tool when the user asks to create, draw, or generate an image."""
@@ -97,18 +121,14 @@ def image_generation_tool(prompt: str, google_api_key: str, pollinations_token: 
         enhancer_prompt = f"Rewrite this short prompt into a detailed, vibrant, and artistic image generation description: {prompt}"
         final_prompt = enhancer_llm.invoke(enhancer_prompt).content.strip()
         
-        # --- FIX 1: URL Encode the prompt to handle special characters ---
         encoded_prompt = quote_plus(final_prompt)
         
         url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?token={pollinations_token}"
         
-        # --- FIX 2: MODIFIED - Increased timeout to 10 seconds ---
         response = requests.get(url, timeout=120)
         
-        # --- FIX 3: Check if the request was successful before processing ---
-        response.raise_for_status()  # This will raise an error for bad status codes (4xx or 5xx)
+        response.raise_for_status() 
         
-        # If the above line passes, we know we have a valid response
         img_bytes = response.content
         img = Image.open(BytesIO(img_bytes))
         
@@ -118,7 +138,6 @@ def image_generation_tool(prompt: str, google_api_key: str, pollinations_token: 
         logging.error(f"HTTP error occurred: {http_err} - Response: {response.text}")
         return {"error": f"The image generation service returned an error: {http_err}"}
     
-    # --- NEW: Catch ReadTimeout specifically to give a better error message ---
     except requests.exceptions.ReadTimeout as timeout_err:
         logging.error(f"Image generation timed out: {timeout_err}")
         return {"error": "The image generation service timed out (took longer than 120s). It might be very busy. Please try again in a moment."}
@@ -126,8 +145,9 @@ def image_generation_tool(prompt: str, google_api_key: str, pollinations_token: 
     except Exception as e:
         logging.error(f"An unexpected error occurred in image generation: {e}")
         return {"error": f"Failed to generate image: {e}"}
+
 # ===================================================================
-# TOOL 3: FILE ANALYSIS TOOL (Streams output)
+# TOOL 3: FILE ANALYSIS TOOL (Unchanged)
 # ===================================================================
 
 def file_analysis_tool(question: str, file_content_as_text: str, google_api_key: str):
@@ -136,10 +156,8 @@ def file_analysis_tool(question: str, file_content_as_text: str, google_api_key:
     This tool is now empowered to use its own expertise to provide a comprehensive analysis.
     """
     print("---TOOL: Executing Empowered File Analysis---")
-    # Using a more powerful model for high-quality analysis and evaluation
     streaming_llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=google_api_key, streaming=True) 
     
-    # This new, "freer" prompt gives the agent permission to be a true expert.
     prompt = f"""
     **Your Persona:** You are a highly intelligent AI assistant and a multi-disciplinary expert. Your goal is to provide the most helpful and insightful analysis possible, combining the provided file content with your own vast knowledge.
 
@@ -163,11 +181,7 @@ def file_analysis_tool(question: str, file_content_as_text: str, google_api_key:
     return streaming_llm.stream([HumanMessage(content=prompt)])
 
 # ===================================================================
-# THE AGENT: A "WORKSHOP MANAGER" THAT CHOOSES THE RIGHT TOOL
-# ===================================================================
-
-# ===================================================================
-# NEW TOOL 3: WEB SEARCH & REAL-TIME DATA ANALYSIS
+# TOOL 4: WEB SEARCH & REAL-TIME DATA ANALYSIS (Unchanged)
 # ===================================================================
 def web_search_tool(query: str, tavily_api_key: str, google_api_key: str) -> str:
     """
@@ -177,13 +191,10 @@ def web_search_tool(query: str, tavily_api_key: str, google_api_key: str) -> str
     print("---TOOL: Executing Web Search and Analysis---")
     try:
         tavily = TavilyClient(api_key=tavily_api_key)
-        # Perform a search and get the most relevant results
         search_results = tavily.search(query=query, search_depth="advanced", max_results=5)
         
-        # Extract the content from the search results
         search_content = "\n".join([result["content"] for result in search_results["results"]])
         
-        # Use a powerful LLM to analyze the search results and answer the user's query
         analyzer_llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=google_api_key)
         analysis_prompt = f"""
         You are an expert research analyst. You have been given a user's query and the results from a web search.
@@ -206,22 +217,34 @@ def web_search_tool(query: str, tavily_api_key: str, google_api_key: str) -> str
     except Exception as e:
         return f"⚠️ Web search failed: {e}"
     
+# ===================================================================
+# THE AGENT: A "WORKSHOP MANAGER" THAT CHOOSES THE RIGHT TOOL
+# ===================================================================
+
 class AgentState(TypedDict):
     query: str
     route: str  # Add this key to store the router's decision
     final_response: Optional[any]
-# These are wrapper functions for the nodes to handle passing state and API keys
-def call_comparison_tool(state: AgentState, google_api_key: str, groq_api_key: str):
-    response = comparison_and_evaluation_tool(state['query'], google_api_key, groq_api_key)
+
+# --- MODIFIED: Wrapper function now needs the mistral_api_key ---
+def call_comparison_tool(state: AgentState, google_api_key: str, groq_api_key: str, mistral_api_key: str):
+    response = comparison_and_evaluation_tool(
+        state['query'], 
+        google_api_key, 
+        groq_api_key,
+        mistral_api_key  # Pass the key through
+    )
     return {"final_response": response}
 
 def call_image_tool(state: AgentState, google_api_key: str, pollinations_token: str):
     response = image_generation_tool(state['query'], google_api_key, pollinations_token)
     return {"final_response": response}
+
 def call_web_search_tool(state: AgentState, tavily_api_key: str, google_api_key: str):
     response = web_search_tool(state['query'], tavily_api_key, google_api_key)
     return {"final_response": response}
 
+# --- Router is UNCHANGED (still routes to 'comparison_tool') ---
 def router(state: AgentState, google_api_key: str):
     """The brain of the agent. Decides which tool to use and updates the 'route' state key."""
     print("---AGENT: Routing query---")
@@ -229,7 +252,7 @@ def router(state: AgentState, google_api_key: str):
     query = state['query']
     
     router_prompt = f"""
-    You are a master routing agent. Determine the user's primary intent and select the appropriate tool. You have two choices:
+    You are a master routing agent. Determine the user's primary intent and select the appropriate tool. You have three choices:
     1.  `comparison_tool`: Use for complex questions, coding problems, analysis, or any text-based query needing a detailed, evaluated answer.
     2.  `image_generation_tool`: Use ONLY if the user explicitly asks to create, draw, or generate an image.
     3.  `web_search_tool`: Use this for any query that requires real-time, up-to-date information. This includes questions about current events, news, weather, recent scientific discoveries, or topics created after 2023.
@@ -248,12 +271,24 @@ def router(state: AgentState, google_api_key: str):
     else:
         print("---AGENT: Decision -> Comparison & Evaluation Tool---")
         return {"route": "comparison_chat"}
-# --- Define the Agentic Graph ---
-def build_agent(google_api_key: str, groq_api_key: str, pollinations_token: str , tavily_api_key: str ):
+
+# --- MODIFIED: Define the Agentic Graph, adding the mistral_api_key ---
+def build_agent(google_api_key: str, groq_api_key: str, pollinations_token: str, tavily_api_key: str, mistral_api_key: str):
+    """
+    Builds the agent graph.
+    Requires an additional 'mistral_api_key' for the judge.
+    """
     workflow = StateGraph(AgentState)
 
     router_with_keys = partial(router, google_api_key=google_api_key)
-    comparison_node = partial(call_comparison_tool, google_api_key=google_api_key, groq_api_key=groq_api_key)
+    
+    # Update the partial function for the comparison node to include the new key
+    comparison_node = partial(
+        call_comparison_tool, 
+        google_api_key=google_api_key, 
+        groq_api_key=groq_api_key,
+        mistral_api_key=mistral_api_key # Pass key to the node
+    )
     image_node = partial(call_image_tool, google_api_key=google_api_key, pollinations_token=pollinations_token)
     web_search_node = partial(call_web_search_tool, tavily_api_key=tavily_api_key, google_api_key=google_api_key)
 
@@ -264,14 +299,14 @@ def build_agent(google_api_key: str, groq_api_key: str, pollinations_token: str 
 
     workflow.set_entry_point("router")
     
-    # The conditional edge function now simply reads the 'route' from the state
     workflow.add_conditional_edges(
         "router",
         lambda state: state["route"],
-        {"comparison_chat": "comparison_chat", "image_generator": "image_generator" , "web_search": "web_search"}
+        {"comparison_chat": "comparison_chat", "image_generator": "image_generator", "web_search": "web_search"}
     )
     
     workflow.add_edge("comparison_chat", END)
     workflow.add_edge("image_generator", END)
     workflow.add_edge("web_search", END)
+    
     return workflow.compile()
