@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 from PIL import Image
 from io import BytesIO
 from PyPDF2 import PdfReader
@@ -75,41 +76,73 @@ def create_copy_button(text_to_copy: str, button_key: str):
 # =======================================================
 # --- NEW: FUNCTION TO SET ANIMATED GRADIENT BG ---
 # =======================================================
-def set_animated_fluid_background():
+def set_vanta_background():
     """
-    Sets a "Fluid Nebula" animated background.
+    Sets a "Vanta.js" animated background.
+    This requires an internet connection to load the external JS libraries.
     """
-    st.markdown(
-         f"""
-         <style>
-         @keyframes fluidMove {{
-             0% {{ background-position: 0% 50%; }}
-             25% {{ background-position: 100% 50%; }}
-             50% {{ background-position: 100% 100%; }}
-             75% {{ background-position: 0% 100%; }}
-             100% {{ background-position: 0% 50%; }}
-         }}
+    # Load the Vanta.js library and its dependency
+    # We use st.html to load the scripts in the head
+    st.html(
+        """
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.dots.min.js"></script>
 
-         .stApp {{
-             background: linear-gradient(45deg, #0a0c27, #004d40, #23a6d5, #2d2d5a);
-             background-size: 300% 300%;
-             animation: fluidMove 20s ease infinite;
-             color: #ffffff;
-         }}
-         
-         /* --- Common Component Styling (for all options) --- */
-         [data-testid="stSidebar"] > div:first-child {{
-             background-color: rgba(10, 12, 39, 0.8); /* Semi-transparent dark base */
-         }}
-         .st-emotion-cache-16txtl3 {{
-             background-color: rgba(10, 12, 39, 0.8);
-         }}
-         [data-testid="chat-message-container"] {{
+        <script>
+        // Wait for the DOM to be fully loaded
+        document.addEventListener("DOMContentLoaded", function() {
+            // Find the Streamlit app container.
+            // This selector targets the main container of the Streamlit app.
+            const streamlitApp = window.parent.document.querySelector('.stApp');
+
+            if (streamlitApp) {
+                // Initialize Vanta.js
+                VANTA.DOTS({
+                    el: streamlitApp,
+                    mouseControls: true,
+                    touchControls: true,
+                    gyroControls: false,
+                    minHeight: 200.00,
+                    minWidth: 200.00,
+                    scale: 1.00,
+                    scaleMobile: 1.00,
+                    color: 0x3f8eff,      // Main dot color (e.g., a nice blue)
+                    color2: 0xffffff,     // Secondary color
+                    backgroundColor: 0x0a0c27, // Your dark background color
+                    size: 3.50,
+                    spacing: 35.00
+                });
+            }
+        });
+        </script>
+        """
+    )
+
+    # Add CSS to ensure the background covers the whole app and content is visible
+    st.markdown(
+         """
+         <style>
+         /* Ensure the Vanta canvas fills the entire app background */
+         .stApp {
+             color: #ffffff; /* Set default text color to white for readability */
+         }
+
+         /* Make sidebar and other elements semi-transparent */
+         [data-testid="stSidebar"] > div:first-child {
+             background-color: rgba(10, 12, 39, 0.8); /* Semi-transparent dark blue */
+         }
+
+         .st-emotion-cache-16txtl3 {
+             background-color: rgba(10, 12, 39, 0.8); /* Match sidebar for consistency */
+         }
+
+         /* Improve chat message visibility */
+         [data-testid="chat-message-container"] {
              background-color: rgba(45, 45, 90, 0.7);
              border-radius: 10px;
              padding: 10px !important;
              margin-bottom: 10px;
-         }}
+         }
          </style>
          """,
          unsafe_allow_html=True
@@ -119,7 +152,7 @@ def set_animated_fluid_background():
 # Page Config and Setup
 # =====================
 st.set_page_config(page_title="🤖 AI Agent Workshop", page_icon="🧠", layout="wide")
-set_animated_fluid_background()
+set_vanta_background()
 # --- Securely load API keys from Streamlit Secrets ---
 try:
     google_api_key = st.secrets["GOOGLE_API_KEY"]
