@@ -80,8 +80,8 @@ def comparison_and_evaluation_tool(query: str, google_api_key: str, groq_api_key
     final_output += f"{chosen_answer}\n\n"
     final_output += f"### 🧠 Judge's Evaluation\n{judgment}\n\n---\n\n"
     final_output += f"### Other Responses\n\n"
-    final_output += f"###🤖 Gemini's Full Response:**\n{gemini_response}\n\n"
-    final_output += f"###⚡ Groq's Full Response:**\n{groq_response}"
+    final_output += f"###🤖 Gemini's Full Response:\n{gemini_response}\n\n"
+    final_output += f"###⚡ Groq's Full Response:\n{groq_response}"
     
     return final_output
 
