@@ -130,6 +130,7 @@ try:
     google_api_key = st.secrets["GOOGLE_API_KEY"]
     pollinations_token = st.secrets["POLLINATIONS_TOKEN"]
     groq_api_key = st.secrets["GROQ_API_KEY"]
+    MISTRAL_API_KEY = st.secrets["MISTRAL_API_KEY"]
     tavily_api_key = st.secrets["TAVILY_API_KEY"]
 except KeyError as e:
     st.error(f"❌ Missing Secret: {e}. Please add it to your Streamlit Secrets.")
