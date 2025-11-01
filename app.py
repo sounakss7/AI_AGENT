@@ -80,23 +80,24 @@ def set_celestial_aurora_background():
     """
     Sets a "Celestial Aurora" animated background using 4 layered gradients.
     """
+    # Note: The 'f' prefix has been REMOVED from st.markdown() to fix the syntax error
     st.markdown(
-         f"""
+         """
          <style>
          @keyframes aurora {
-             0% {{ background-position: 0% 50%; }}
-             25% {{ background-position: 100% 50%; }}
-             50% {{ background-position: 100% 100%; }}
-             75% {{ background-position: 0% 100%; }}
-             100% {{ background-position: 0% 50%; }}
+             0% { background-position: 0% 50%; }
+             25% { background-position: 100% 50%; }
+             50% { background-position: 100% 100%; }
+             75% { background-position: 0% 100%; }
+             100% { background-position: 0% 50%; }
          }
          
          @keyframes aurora2 {
-             0% {{ background-position: 100% 0%; }}
-             100% {{ background-position: 0% 100%; }}
+             0% { background-position: 100% 0%; }
+             100% { background-position: 0% 100%; }
          }
          
-         .stApp {{
+         .stApp {
              color: #ffffff;
              background-color: #020122; /* Dark indigo base */
              
@@ -114,21 +115,21 @@ def set_celestial_aurora_background():
              animation: 
                  aurora 20s ease infinite,
                  aurora2 25s ease-in-out infinite alternate;
-         }}
+         }
          
          /* --- Component Styling --- */
-         [data-testid="stSidebar"] > div:first-child {{
+         [data-testid="stSidebar"] > div:first-child {
              background-color: rgba(2, 1, 34, 0.8); /* Semi-transparent indigo base */
-         }}
-         .st-emotion-cache-16txtl3 {{
+         }
+         .st-emotion-cache-16txtl3 {
              background-color: rgba(2, 1, 34, 0.8);
-         }}
-         [data-testid="chat-message-container"] {{
+         }
+         [data-testid="chat-message-container"] {
              background-color: rgba(45, 45, 90, 0.7);
              border-radius: 10px;
              padding: 10px !important;
              margin-bottom: 10px;
-         }}
+         }
          </style>
          """,
          unsafe_allow_html=True
