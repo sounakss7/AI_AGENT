@@ -365,7 +365,7 @@ if prompt := st.chat_input("Ask about the latest news, create an image, or query
             
             else:
                 # --- This is the Agent Path ---
-                agent = build_agent(google_api_key, groq_api_key, pollinations_token, tavily_api_key)
+                agent = build_agent(google_api_key, groq_api_key, pollinations_token, tavily_api_key, mistral_api_key)
                 
                 final_response, trace_steps, tool_used_key = asyncio.run(run_agent_and_capture_trajectory(agent, prompt))
                 st.session_state.trajectory.append({"prompt": prompt, "steps": trace_steps})
