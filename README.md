@@ -82,18 +82,37 @@ python -m venv venv
 Create a `requirements.txt` file in your project root with the following content:
 
 ```text
-streamlit
-pandas
-Pillow
 PyPDF2
-PyMuPDF
-pytesseract
-requests
-langchain-google-genai
+streamlit
+python-dotenv
 langchain
+langsmith
+langchain-google-genai
+google-generativeai
+fal-client
+openai
+langchain-openai
+pillow
+python-dotenv
+requests
+audio-recorder-streamlit
+PyPDF2
+pytesseract
+pdf2image
+Pillow
+pymupdf
+concurrent-log-handler
+feedparser
 langgraph
 tavily-python
-pip install -r requirements.txt
+pandas
+# --- LangChain Ecosystem (COMPATIBLE SET) ---
+langchain==0.1.17
+langchain-core==0.1.52
+langchain-google-genai==0.0.11
+langchain-openai==0.1.7
+langgraph==0.0.30  
+gTTS pip install -r requirements.txt
 ```
 ### 5. Configure API Keys
 
