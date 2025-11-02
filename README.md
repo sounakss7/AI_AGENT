@@ -30,7 +30,7 @@ The application operates on two primary workflows, determined by whether a file 
 1.  **File Analysis Path:** A direct, non-agentic path where uploaded file content is processed and sent directly to the `file_analysis_tool`.
 2.  **Core Agent Path:** When no file is present, the query is handled by the LangGraph agent, which routes it to the appropriate tool (Web Search, Image Gen, or Comparison).
 
-![Agent Workflow Diagram](workflow_diagram.png)
+![Agent Workflow Diagram](workflow_architecture.png)
 
 ## 🛠️ Tech Stack
 
