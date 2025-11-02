@@ -55,10 +55,8 @@ def query_mistral_judge(prompt: str, mistral_api_key: str):
     except Exception as e:
         logging.error(f"Mistral Judge Exception: {e}")
         return f"Error: The Mistral judge ran into an exception: {e}"
-# ... (all your other imports and tool functions like query_groq, query_mistral_judge stay the same) ...
 
-
-# --- THIS IS THE CORRECTED FUNCTION ---
+# --- MODIFIED: The evaluation tool now uses Mistral as the judge ---
 def comparison_and_evaluation_tool(query: str, google_api_key: str, groq_api_key: str, mistral_api_key: str) -> str:
     """
     Runs a query through Gemini and Groq, has a MISTRAL AI judge evaluate the best response,
@@ -66,8 +64,11 @@ def comparison_and_evaluation_tool(query: str, google_api_key: str, groq_api_key
     """
     print("---TOOL: Executing Comparison (Judged by Mistral)---")
     
+    # Use the fast model for the head-to-head comparison
     fast_llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=google_api_key)
     
+    # The Gemini judge_llm is no longer needed and has been removed.
+
     with concurrent.futures.ThreadPoolExecutor() as executor:
         future_gemini = executor.submit(lambda: fast_llm.invoke(query).content)
         future_groq = executor.submit(query_groq, query, groq_api_key)
@@ -90,64 +91,26 @@ def comparison_and_evaluation_tool(query: str, google_api_key: str, groq_api_key
     3. **Evaluate the responses purely on their merit for the given query. Do not show bias towards any model provider. Your judgment must be neutral and unbiased.**
     """
     
+    # --- THIS IS THE KEY CHANGE ---
+    # Use the new Mistral judge function instead of the Gemini judge
     print("---JUDGE: Calling Mistral for evaluation---")
     judgment = query_mistral_judge(judge_prompt, mistral_api_key)
+    # --- END OF KEY CHANGE ---
     
     match = re.search(r"winner\s*:\s*(gemini|groq)", judgment, re.IGNORECASE)
     winner = match.group(1).capitalize() if match else "Evaluation"
     
-    # --- THIS LINE IS REMOVED ---
-    # chosen_answer = gemini_response if winner == "Gemini" else groq_response
+    chosen_answer = gemini_response if winner == "Gemini" else groq_response
     
-    # =======================================================
-    # --- NEW, CORRECTED LOGIC ---
-    # =======================================================
-    
-    final_output = "" # Initialize empty output
-
-    if winner == "Gemini":
-        # 1. Start with the winner's answer
-        final_output += f"### 🏆 Judged Best Answer (Gemini)\n"
-        final_output += f"{gemini_response}\n\n"
-        
-        # 2. Add the judge's reasoning
-        final_output += f"### 🧠 Judge's Evaluation (from Mistral)\n{judgment}\n\n---\n\n"
-        
-        # 3. Add ONLY the loser's response
-        final_output += f"### 💡 Alternative Response\n\n"
-        final_output += f"**⚡ Groq's Full Response:**\n{groq_response}"
-
-    elif winner == "Groq":
-        # 1. Start with the winner's answer
-        final_output += f"### 🏆 Judged Best Answer (Groq)\n"
-        final_output += f"{groq_response}\n\n"
-        
-        # 2. Add the judge's reasoning
-        final_output += f"### 🧠 Judge's Evaluation (from Mistral)\n{judgment}\n\n---\n\n"
-        
-        # 3. Add ONLY the loser's response
-        final_output += f"### 💡 Alternative Response\n\n"
-        final_output += f"**🤖 Gemini's Full Response:**\n{gemini_response}"
-
-    else:
-        # FALLBACK: If judge is unclear (e.g., "Evaluation")
-        # Default to showing Gemini as the primary answer.
-        
-        final_output += f"### 🏆 Primary Answer (Gemini)\n"
-        final_output += f"{gemini_response}\n\n"
-        
-        # 2. Add the judge's reasoning (which explains *why* it was unclear)
-        final_output += f"### 🧠 Judge's Evaluation (from Mistral)\n{judgment}\n\n---\n\n"
-        
-        # 3. Add the other response as the alternative
-        final_output += f"### 💡 Alternative Response\n\n"
-        final_output += f"**⚡ Groq's Full Response:**\n{groq_response}"
-
-    # =======================================================
-    # --- END OF KEY CHANGE ---
-    # =======================================================
+    final_output = f"### 🏆 Judged Best Answer ({winner})\n"
+    final_output += f"{chosen_answer}\n\n"
+    final_output += f"### 🧠 Judge's Evaluation (from Mistral)\n{judgment}\n\n---\n\n"
+    final_output += f"### Other Responses\n\n"
+    final_output += f"**🤖 Gemini's Full Response:**\n{gemini_response}\n\n"
+    final_output += f"**⚡ Groq's Full Response:**\n{groq_response}"
     
     return final_output
+
 # ===================================================================
 # TOOL 2: IMAGE GENERATION TOOL (Unchanged)
 # ===================================================================
