@@ -39,9 +39,10 @@ The application operates on two primary workflows, determined by whether a file 
 -   **Language:** Python
 -   **Core Libraries:** Pandas, Pillow, PyPDF2, PyMuPDF (fitz), Pytesseract ,**gTTS**
 -   **APIs & Services:**
-    -   **LLMs:** Google Gemini, Groq API (Llama, OpenAI models)
+    -   **LLMs:** Google Gemini, Groq API (Llama, OpenAI models), Mistral AI
     -   **Web Search:** Tavily AI
     -   **Image Generation:** Pollinations AI
+    -   **Traces & Analytics:** LangSmith
 
 ## 🚀 Getting Started
 
