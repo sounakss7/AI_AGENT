@@ -1,6 +1,2 @@
 [theme]
 base = "dark"
-primaryColor = "#1E1E1E" # Or any dark hex code
-# You can also set other colors to match your purple theme
-# backgroundColor = "#1A1A2E"
-# secondaryBackgroundColor = "#2A2A4E"
