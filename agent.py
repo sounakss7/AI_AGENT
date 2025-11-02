@@ -6,6 +6,7 @@ from PIL import Image
 from typing import TypedDict, Optional
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.schema import HumanMessage
+from langchain.schema import BaseMessage
 from langgraph.graph import StateGraph, END
 import concurrent.futures
 from functools import partial
@@ -224,6 +225,7 @@ def web_search_tool(query: str, tavily_api_key: str, google_api_key: str) -> str
 class AgentState(TypedDict):
     query: str
     route: str  # Add this key to store the router's decision
+    history: list[BaseMessage]
     final_response: Optional[any]
 
 # --- MODIFIED: Wrapper function now needs the mistral_api_key ---
