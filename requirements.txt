@@ -2,6 +2,7 @@ PyPDF2
 streamlit
 python-dotenv
 langchain
+langsmith
 langchain-google-genai
 google-generativeai
 fal-client
