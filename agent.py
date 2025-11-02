@@ -20,8 +20,8 @@ import logging
 
 def choose_groq_model(prompt: str):
     p = prompt.lower()
-    if any(x in p for x in ["python", "code", "algorithm", "bug", "function", "script"]):
-        return "openai/gpt-oss-20b"
+    if any(x in p for x in ["python", "code", "algorithm", "bug", "function", "script" ,"information" , "analysis"]):
+        return "openai/gpt-oss-120b"
     else:
         return "llama-3.1-8b-instant"
 
