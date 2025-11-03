@@ -166,25 +166,21 @@ with st.sidebar:
     if st.button("Search"):
         if search_query:
             encoded_query = quote_plus(search_query)
-            search_url = f"https://www.google.com/search?q={encoded_query}"
-            st.markdown(f"[Open Google search results]({search_url})", unsafe_allow_html=True)
+            search_url = f"[https://www.google.com/search?q=](https://www.google.com/search?q=){encoded_query}"
+            st.markdown(f'<a href="{search_url}" target="_blank">Open Google search results</a>', unsafe_allow_html=True)
         else:
             st.warning("Please enter a search query.")
 
     st.header("📂 File Analysis")
     uploaded_file = st.file_uploader("Upload a file to ask questions about it", type=["pdf", "txt", "py", "js", "html", "css"])
-
+    
     st.header("🧭 Utilities")
     if st.button("Clear Chat History & Reset Metrics"):
         st.session_state.messages = []
-        st.session_state.trajectory = []
+        st.session_state.trajectory = [] # --- ADDED: Clear trajectory on reset ---
         st.session_state.metrics = {
-            "total_requests": 0,
-            "tool_usage": {"Comparison": 0, "Image Gen": 0, "Web Search": 0, "File Analysis": 0},
-            "total_latency": 0.0,
-            "average_latency": 0.0,
-            "accuracy_feedback": {"👍": 0, "👎": 0},
-            "last_query_details": {}
+            "total_requests": 0, "tool_usage": {"Comparison": 0, "Image Gen": 0, "Web Search": 0, "File Analysis": 0},
+            "total_latency": 0.0, "average_latency": 0.0, "accuracy_feedback": {"👍": 0, "👎": 0}, "last_query_details": {}
         }
         st.rerun()
 
@@ -194,7 +190,7 @@ with st.sidebar:
         "Ask about current events to see the Web Search tool in action!",
         "Upload a Python file and ask for a score to test File Analysis."
     ]))
-
+    
     st.markdown("### 🕒 Live Server Time")
     st.info(datetime.now().strftime("%d %B %Y, %I:%M:%S %p"))
 
