@@ -5,7 +5,7 @@ from io import BytesIO
 from PIL import Image
 from typing import TypedDict, Optional
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.schema import HumanMessage, AIMessage  # <-- (FIX 1: Imported AIMessage)
+from langchain.schema import HumanMessage
 from langchain.schema import BaseMessage
 from langgraph.graph import StateGraph, END
 import concurrent.futures
@@ -25,25 +25,10 @@ def choose_groq_model(prompt: str):
     else:
         return "llama-3.1-8b-instant"
 
-# --- (FIX 2: query_groq now accepts and formats history) ---
-def query_groq(prompt: str, history: list[BaseMessage], groq_api_key: str):
+def query_groq(prompt: str, groq_api_key: str):
     model = choose_groq_model(prompt)
     headers = {"Authorization": f"Bearer {groq_api_key}", "Content-Type": "application/json"}
-    
-    # Format history for Groq's API
-    groq_messages = []
-    for msg in history:
-        if msg.type == 'human':
-            groq_messages.append({"role": "user", "content": msg.content})
-        elif msg.type == 'ai':
-            groq_messages.append({"role": "assistant", "content": msg.content})
-            
-    # Add the current prompt
-    groq_messages.append({"role": "user", "content": prompt})
-
-    # Pass the full message list
-    data = {"model": model, "messages": groq_messages, "max_tokens": 2048}
-    
+    data = {"model": model, "messages": [{"role": "user", "content": prompt}], "max_tokens": 2048}
     try:
         resp = requests.post("https://api.groq.com/openai/v1/chat/completions", json=data, headers=headers)
         if resp.status_code == 200:
@@ -71,8 +56,8 @@ def query_mistral_judge(prompt: str, mistral_api_key: str):
         logging.error(f"Mistral Judge Exception: {e}")
         return f"Error: The Mistral judge ran into an exception: {e}"
 
-# --- (FIX 3: comparison_and_evaluation_tool now accepts and uses history) ---
-def comparison_and_evaluation_tool(query: str, history: list[BaseMessage], google_api_key: str, groq_api_key: str, mistral_api_key: str) -> str:
+# --- MODIFIED: The evaluation tool now uses Mistral as the judge ---
+def comparison_and_evaluation_tool(query: str, google_api_key: str, groq_api_key: str, mistral_api_key: str) -> str:
     """
     Runs a query through Gemini and Groq, has a MISTRAL AI judge evaluate the best response,
     and formats everything into a comprehensive answer.
@@ -82,14 +67,11 @@ def comparison_and_evaluation_tool(query: str, history: list[BaseMessage], googl
     # Use the fast model for the head-to-head comparison
     fast_llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=google_api_key)
     
-    # Format messages for Gemini
-    gemini_messages = history + [HumanMessage(content=query)]
+    # The Gemini judge_llm is no longer needed and has been removed.
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        # Pass history to both models
-        future_gemini = executor.submit(lambda: fast_llm.invoke(gemini_messages).content)
-        future_groq = executor.submit(query_groq, query, history, groq_api_key) # <-- pass history
-        
+        future_gemini = executor.submit(lambda: fast_llm.invoke(query).content)
+        future_groq = executor.submit(query_groq, query, groq_api_key)
         gemini_response = future_gemini.result()
         groq_response = future_groq.result()
 
@@ -246,11 +228,10 @@ class AgentState(TypedDict):
     history: list[BaseMessage]
     final_response: Optional[any]
 
-# --- (FIX 4: call_comparison_tool now passes history from the state) ---
+# --- MODIFIED: Wrapper function now needs the mistral_api_key ---
 def call_comparison_tool(state: AgentState, google_api_key: str, groq_api_key: str, mistral_api_key: str):
     response = comparison_and_evaluation_tool(
-        state['query'],
-        state['history'],  # <-- PASS HISTORY FROM STATE
+        state['query'], 
         google_api_key, 
         groq_api_key,
         mistral_api_key  # Pass the key through
@@ -265,35 +246,20 @@ def call_web_search_tool(state: AgentState, tavily_api_key: str, google_api_key:
     response = web_search_tool(state['query'], tavily_api_key, google_api_key)
     return {"final_response": response}
 
-# --- (FIX 5: The router now reads history to make its decision) ---
+# --- Router is UNCHANGED (still routes to 'comparison_tool') ---
 def router(state: AgentState, google_api_key: str):
     """The brain of the agent. Decides which tool to use and updates the 'route' state key."""
     print("---AGENT: Routing query---")
     router_llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=google_api_key)
-    
-    # Format history for the router
-    history = state.get('history', [])
-    history_formatted = "\n".join(
-        [f"{'Human' if msg.type == 'human' else 'AI'}: {msg.content}" for msg in history]
-    )
-    
     query = state['query']
     
     router_prompt = f"""
-    You are a master routing agent. Based on the *most recent* user query and the conversation history,
-    determine the user's primary intent and select the appropriate tool.
-
-    ### Conversation History:
-    {history_formatted}
-
-    ### Most Recent User Query:
-    "{query}"
-    
-    You have three choices:
+    You are a master routing agent. Determine the user's primary intent and select the appropriate tool. You have three choices:
     1.  `comparison_tool`: Use for complex questions, coding problems, analysis, or any text-based query needing a detailed, evaluated answer.
     2.  `image_generation_tool`: Use ONLY if the user explicitly asks to create, draw, or generate an image.
     3.  `web_search_tool`: Use this for any query that requires real-time, up-to-date information. This includes questions about current events, news, weather, recent scientific discoveries, or topics created after 2023.
 
+    User Query: "{query}"
     Return ONLY the tool name (`comparison_tool` or `image_generation_tool` or `web_search_tool`).
     """
     response = router_llm.invoke(router_prompt).content.strip()
