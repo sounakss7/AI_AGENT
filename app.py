@@ -168,7 +168,7 @@ with st.sidebar:
         if search_query:
             encoded_query = quote_plus(search_query)
             # 1. Correctly format the URL
-            search_url = f"[https://www.google.com/search?q=](https://www.google.com/search?q=){encoded_query}"
+            search_url = f"https://www.google.com/search?q={encoded_query}"
             # 2. Use st.link_button, which is built to handle external links safely
             st.link_button("Open Google search results", url=search_url) 
         else:
