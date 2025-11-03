@@ -17,6 +17,9 @@ import json
 # --- NEW: Import gTTS ---
 from gtts import gTTS
 
+# --- NEW: Import Langchain message types ---
+from langchain.schema import HumanMessage, AIMessage
+
 # Import the agent logic
 from agent import build_agent, file_analysis_tool
 
@@ -83,41 +86,41 @@ def set_animated_fluid_background():
     # NOTE: The "f" from f"""...""" has been removed to fix a SyntaxError
     st.markdown(
          """
-         <style>
-         @keyframes fluidMove {
-             0% { background-position: 0% 50%; }
-             25% { background-position: 100% 50%; }
-             50% { background-position: 100% 100%; }
-             75% { background-position: 0% 100%; }
-             100% { background-position: 0% 50%; }
-         }
+        <style>
+        @keyframes fluidMove {
+            0% { background-position: 0% 50%; }
+            25% { background-position: 100% 50%; }
+            50% { background-position: 100% 100%; }
+            75% { background-position: 0% 100%; }
+            100% { background-position: 0% 50%; }
+        }
 
-         .stApp {
-             /* --- THIS IS YOUR NEW DEEP BLUE GRADIENT --- */
-             background: linear-gradient(45deg, #0a0c27, #001f5a, #4a0d6a, #0052D4);
-             background-size: 300% 300%;
-             animation: fluidMove 20s ease infinite;
-             color: #ffffff;
-         }
-         
-         /* --- Updated Component Styling --- */
-         [data-testid="stSidebar"] > div:first-child {
-             /* Base color is still dark indigo */
-             background-color: rgba(10, 12, 39, 0.8);
-         }
-         .st-emotion-cache-16txtl3 {
-             background-color: rgba(10, 12, 39, 0.8);
-         }
-         [data-testid="chat-message-container"] {
-             /* Chat bubbles are now tinted deep blue */
-             background-color: rgba(0, 31, 90, 0.7);
-             border-radius: 10px;
-             padding: 10px !important;
-             margin-bottom: 10px;
-         }
-         </style>
-         """,
-         unsafe_allow_html=True
+        .stApp {
+            /* --- THIS IS YOUR NEW DEEP BLUE GRADIENT --- */
+            background: linear-gradient(45deg, #0a0c27, #001f5a, #4a0d6a, #0052D4);
+            background-size: 300% 300%;
+            animation: fluidMove 20s ease infinite;
+            color: #ffffff;
+        }
+        
+        /* --- Updated Component Styling --- */
+        [data-testid="stSidebar"] > div:first-child {
+            /* Base color is still dark indigo */
+            background-color: rgba(10, 12, 39, 0.8);
+        }
+        .st-emotion-cache-16txtl3 {
+            background-color: rgba(10, 12, 39, 0.8);
+        }
+        [data-testid="chat-message-container"] {
+            /* Chat bubbles are now tinted deep blue */
+            background-color: rgba(0, 31, 90, 0.7);
+            border-radius: 10px;
+            padding: 10px !important;
+            margin-bottom: 10px;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
      )
 # =======================================================
 # =====================
@@ -276,9 +279,10 @@ for i, message in enumerate(st.session_state.messages):
             )
 
 # =================================================================================
-# --- AGDebugger Logic (Unchanged) ---
+# --- *** MODIFIED: AGENT DEBUGGER LOGIC *** ---
 # =================================================================================
-async def run_agent_and_capture_trajectory(agent, prompt):
+# --- MODIFIED: Function now accepts a dictionary 'agent_input' ---
+async def run_agent_and_capture_trajectory(agent, agent_input: dict):
     """
     Runs the agent using astream_events and captures a detailed trace of its execution,
     including inputs and outputs for each step.
@@ -288,7 +292,8 @@ async def run_agent_and_capture_trajectory(agent, prompt):
     final_response = None
     tool_used = "N/A"
 
-    async for event in agent.astream_events({"query": prompt}, version="v1"):
+    # --- MODIFIED: Pass the full 'agent_input' dictionary ---
+    async for event in agent.astream_events(agent_input, version="v1"):
         kind = event["event"]
         
         if kind == "on_chain_start":
@@ -320,18 +325,36 @@ def pretty_print_dict(d):
     def safe_converter(o):
         if isinstance(o, (Image.Image, bytes)):
             return f"<{type(o).__name__} object>"
+        # --- NEW: Handle LangChain messages gracefully ---
+        if isinstance(o, (HumanMessage, AIMessage)):
+            return f"[{o.type.upper()}] {o.content}"
         return str(o)
     
     if not isinstance(d, dict):
+        # --- MODIFIED: Handle list of messages in 'input' ---
+        if isinstance(d, list):
+             return "```json\n" + json.dumps(d, indent=2, default=safe_converter) + "\n```"
         return f"```\n{str(d)}\n```"
         
     return "```json\n" + json.dumps(d, indent=2, default=safe_converter) + "\n```"
 
 
 # =================================================================================
-# --- MODIFIED: Main Chat Input Logic (REMOVED automatic audio generation) ---
+# --- *** MODIFIED: MAIN CHAT INPUT LOGIC *** ---
 # =================================================================================
 if prompt := st.chat_input("Ask about the latest news, create an image, or query a file..."):
+    
+    # --- NEW: Format chat history *before* appending the new prompt ---
+    # This creates the memory for the agent
+    langchain_history = []
+    for msg in st.session_state.messages:
+        if msg["role"] == "user":
+            langchain_history.append(HumanMessage(content=msg["text"]))
+        elif msg["role"] == "assistant" and "text" in msg:
+            # Only add text-based assistant messages to history
+            langchain_history.append(AIMessage(content=msg["text"]))
+
+    # Now, add the user's *new* message to the display list
     st.session_state.messages.append({"role": "user", "text": prompt})
     
     with st.chat_message("assistant"):
@@ -340,7 +363,7 @@ if prompt := st.chat_input("Ask about the latest news, create an image, or query
             tool_used_key = ""
 
             if uploaded_file:
-                # --- This is the File Analysis Path ---
+                # --- This is the File Analysis Path (no history needed) ---
                 tool_used_key = "File Analysis"
                 file_bytes = uploaded_file.read()
                 file_text = ""
@@ -360,19 +383,28 @@ if prompt := st.chat_input("Ask about the latest news, create an image, or query
                 response_stream = file_analysis_tool(prompt, file_text, google_api_key)
                 full_response = st.write_stream(response_stream)
                 
-                # --- MODIFIED: Store None for audio, it will be generated on-demand ---
                 st.session_state.messages.append({"role": "assistant", "text": full_response, "audio_bytes": None})
             
             else:
-                # --- This is the Agent Path ---
+                # --- This is the Agent Path (WITH HISTORY) ---
                 agent = build_agent(google_api_key, groq_api_key, pollinations_token, tavily_api_key, mistral_api_key)
                 
-                final_response, trace_steps, tool_used_key = asyncio.run(run_agent_and_capture_trajectory(agent, prompt))
-                st.session_state.trajectory.append({"prompt": prompt, "steps": trace_steps})
+                # --- NEW: Create the agent input dictionary ---
+                agent_input = {
+                    "query": prompt,
+                    "history": langchain_history
+                }
+                
+                # --- MODIFIED: Pass the full 'agent_input' dict ---
+                final_response, trace_steps, tool_used_key = asyncio.run(
+                    run_agent_and_capture_trajectory(agent, agent_input)
+                )
+                
+                # --- MODIFIED: Pass 'agent_input' to trajectory for debugging ---
+                st.session_state.trajectory.append({"prompt": prompt, "steps": trace_steps, "input_state": agent_input})
 
                 if isinstance(final_response, str):
                     st.markdown(final_response)
-                    # --- MODIFIED: Store None for audio ---
                     st.session_state.messages.append({"role": "assistant", "text": final_response, "audio_bytes": None})
                 
                 elif isinstance(final_response, dict) and "image" in final_response:
@@ -384,17 +416,14 @@ if prompt := st.chat_input("Ask about the latest news, create an image, or query
                     st.session_state.messages.append({
                         "role": "assistant", "image_bytes": byte_im, "text": f"Image generated for: *{prompt}*",
                         "caption": final_response.get("caption", prompt)
-                        # No audio for image-only responses
                     })
                 
                 else:
                     error_message = final_response.get("error", "Sorry, something went wrong.")
                     st.markdown(f"Error: {error_message}")
-                    # --- MODIFIED: Store None for audio ---
                     st.session_state.messages.append({"role": "assistant", "text": f"Error: {error_message}", "audio_bytes": None})
             
             # --- Metrics Recording (logic is unchanged) ---
-            # This timer now stops *before* any audio is generated, giving an accurate latency.
             end_time = time.time()
             latency = end_time - start_time
             metrics = st.session_state.metrics
@@ -410,11 +439,17 @@ if prompt := st.chat_input("Ask about the latest news, create an image, or query
             
             st.rerun()
 
-# --- MODIFIED: Debug View (Unchanged from your version) ---
+# --- MODIFIED: Debug View (Now shows full agent input) ---
 if st.session_state.trajectory:
     with st.expander("🕵️ Agent Trajectory / Debug View", expanded=False):
         for run in reversed(st.session_state.trajectory):
             st.markdown(f"#### Prompt: *'{run.get('prompt', 'N/A')}'*")
+            
+            # --- NEW: Show the full input state (query + history) ---
+            if 'input_state' in run:
+                with st.container(border=True):
+                    st.markdown("##### 📥 Agent Input State")
+                    st.markdown(pretty_print_dict(run['input_state']), unsafe_allow_html=True)
             
             steps = run.get('steps', [])
             

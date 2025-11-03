@@ -5,7 +5,7 @@ from io import BytesIO
 from PIL import Image
 from typing import TypedDict, Optional
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.schema import HumanMessage
+from langchain.schema import HumanMessage, AIMessage # <-- Import AIMessage
 from langchain.schema import BaseMessage
 from langgraph.graph import StateGraph, END
 import concurrent.futures
@@ -246,20 +246,37 @@ def call_web_search_tool(state: AgentState, tavily_api_key: str, google_api_key:
     response = web_search_tool(state['query'], tavily_api_key, google_api_key)
     return {"final_response": response}
 
-# --- Router is UNCHANGED (still routes to 'comparison_tool') ---
+# --- *** THIS IS THE MAIN CHANGE FOR 'agent.py' *** ---
 def router(state: AgentState, google_api_key: str):
     """The brain of the agent. Decides which tool to use and updates the 'route' state key."""
     print("---AGENT: Routing query---")
     router_llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=google_api_key)
+    
+    # --- NEW: Format history for the router ---
+    # We get the history from the state, which is passed in from the app
+    history = state.get('history', [])
+    history_formatted = "\n".join(
+        [f"{'Human' if msg.type == 'human' else 'AI'}: {msg.content}" for msg in history]
+    )
+
     query = state['query']
     
+    # --- MODIFIED: The prompt now includes the conversation history ---
     router_prompt = f"""
-    You are a master routing agent. Determine the user's primary intent and select the appropriate tool. You have three choices:
+    You are a master routing agent. Based on the *most recent* user query and the conversation history,
+    determine the user's primary intent and select the appropriate tool.
+
+    ### Conversation History:
+    {history_formatted}
+
+    ### Most Recent User Query:
+    "{query}"
+
+    You have three choices:
     1.  `comparison_tool`: Use for complex questions, coding problems, analysis, or any text-based query needing a detailed, evaluated answer.
-    2.  `image_generation_tool`: Use ONLY if the user explicitly asks to create, draw, or generate an image.
+    2.  `image_generation_tool`: Use ONLY if the user explicitly asks to create, draw, or generate an image. (e.g., "draw me a...", "can you make an image of...")
     3.  `web_search_tool`: Use this for any query that requires real-time, up-to-date information. This includes questions about current events, news, weather, recent scientific discoveries, or topics created after 2023.
 
-    User Query: "{query}"
     Return ONLY the tool name (`comparison_tool` or `image_generation_tool` or `web_search_tool`).
     """
     response = router_llm.invoke(router_prompt).content.strip()
