@@ -83,40 +83,40 @@ def set_animated_fluid_background():
     # NOTE: The "f" from f"""...""" has been removed to fix a SyntaxError
     st.markdown(
          """
-         <style>
-         @keyframes fluidMove {
-             0% { background-position: 0% 50%; }
-             25% { background-position: 100% 50%; }
-             50% { background-position: 100% 100%; }
-             75% { background-position: 0% 100%; }
-             100% { background-position: 0% 50%; }
-         }
+        <style>
+        @keyframes fluidMove {
+            0% { background-position: 0% 50%; }
+            25% { background-position: 100% 50%; }
+            50% { background-position: 100% 100%; }
+            75% { background-position: 0% 100%; }
+            100% { background-position: 0% 50%; }
+        }
 
-         .stApp {
-             /* --- THIS IS YOUR NEW DEEP BLUE GRADIENT --- */
-             background: linear-gradient(45deg, #0a0c27, #001f5a, #4a0d6a, #0052D4);
-             background-size: 300% 300%;
-             animation: fluidMove 20s ease infinite;
-             color: #ffffff;
-         }
-         
-         /* --- Updated Component Styling --- */
-         [data-testid="stSidebar"] > div:first-child {
-             /* Base color is still dark indigo */
-             background-color: rgba(10, 12, 39, 0.8);
-         }
-         .st-emotion-cache-16txtl3 {
-             background-color: rgba(10, 12, 39, 0.8);
-         }
-         [data-testid="chat-message-container"] {
-             /* Chat bubbles are now tinted deep blue */
-             background-color: rgba(0, 31, 90, 0.7);
-             border-radius: 10px;
-             padding: 10px !important;
-             margin-bottom: 10px;
-         }
-         </style>
-         """,
+        .stApp {
+            /* --- THIS IS YOUR NEW DEEP BLUE GRADIENT --- */
+            background: linear-gradient(45deg, #0a0c27, #001f5a, #4a0d6a, #0052D4);
+            background-size: 300% 300%;
+            animation: fluidMove 20s ease infinite;
+            color: #ffffff;
+        }
+        
+        /* --- Updated Component Styling --- */
+        [data-testid="stSidebar"] > div:first-child {
+            /* Base color is still dark indigo */
+            background-color: rgba(10, 12, 39, 0.8);
+        }
+        .st-emotion-cache-16txtl3 {
+            background-color: rgba(10, 12, 39, 0.8);
+        }
+        [data-testid="chat-message-container"] {
+            /* Chat bubbles are now tinted deep blue */
+            background-color: rgba(0, 31, 90, 0.7);
+            border-radius: 10px;
+            padding: 10px !important;
+            margin-bottom: 10px;
+        }
+        </style>
+        """,
          unsafe_allow_html=True
      )
 # =======================================================
@@ -161,15 +161,19 @@ st.title("🧠 AI Agent Workshop")
 st.write("I can search the web, create images, analyze documents, and more!")
 
 with st.sidebar:
+    # --- THIS IS THE FIXED SECTION ---
     st.header("🔍 Google Search")
     search_query = st.text_input("Search the web directly...", key="google_search")
     if st.button("Search"):
         if search_query:
             encoded_query = quote_plus(search_query)
+            # 1. Correctly format the URL
             search_url = f"[https://www.google.com/search?q=](https://www.google.com/search?q=){encoded_query}"
-            st.markdown(f'<a href="{search_url}" target="_blank">Open Google search results</a>', unsafe_allow_html=True)
+            # 2. Use st.link_button, which is built to handle external links safely
+            st.link_button("Open Google search results", url=search_url) 
         else:
             st.warning("Please enter a search query.")
+    # --- END OF FIXED SECTION ---
 
     st.header("📂 File Analysis")
     uploaded_file = st.file_uploader("Upload a file to ask questions about it", type=["pdf", "txt", "py", "js", "html", "css"])
