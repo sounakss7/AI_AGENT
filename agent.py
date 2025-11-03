@@ -5,7 +5,7 @@ from io import BytesIO
 from PIL import Image
 from typing import TypedDict, Optional
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.schema import HumanMessage, AIMessage  # <-- ***(CHANGE 1: Import AIMessage)***
+from langchain.schema import HumanMessage, AIMessage  # <-- (FIX 1: Imported AIMessage)
 from langchain.schema import BaseMessage
 from langgraph.graph import StateGraph, END
 import concurrent.futures
@@ -25,12 +25,12 @@ def choose_groq_model(prompt: str):
     else:
         return "llama-3.1-8b-instant"
 
-# --- *** (CHANGE 2: Modify query_groq to accept history) *** ---
+# --- (FIX 2: query_groq now accepts and formats history) ---
 def query_groq(prompt: str, history: list[BaseMessage], groq_api_key: str):
     model = choose_groq_model(prompt)
     headers = {"Authorization": f"Bearer {groq_api_key}", "Content-Type": "application/json"}
     
-    # --- NEW: Format history for Groq's API ---
+    # Format history for Groq's API
     groq_messages = []
     for msg in history:
         if msg.type == 'human':
@@ -41,7 +41,7 @@ def query_groq(prompt: str, history: list[BaseMessage], groq_api_key: str):
     # Add the current prompt
     groq_messages.append({"role": "user", "content": prompt})
 
-    # --- MODIFIED: Pass the full message list ---
+    # Pass the full message list
     data = {"model": model, "messages": groq_messages, "max_tokens": 2048}
     
     try:
@@ -71,7 +71,7 @@ def query_mistral_judge(prompt: str, mistral_api_key: str):
         logging.error(f"Mistral Judge Exception: {e}")
         return f"Error: The Mistral judge ran into an exception: {e}"
 
-# --- *** (CHANGE 3: Modify comparison_and_evaluation_tool to accept history) *** ---
+# --- (FIX 3: comparison_and_evaluation_tool now accepts and uses history) ---
 def comparison_and_evaluation_tool(query: str, history: list[BaseMessage], google_api_key: str, groq_api_key: str, mistral_api_key: str) -> str:
     """
     Runs a query through Gemini and Groq, has a MISTRAL AI judge evaluate the best response,
@@ -82,11 +82,11 @@ def comparison_and_evaluation_tool(query: str, history: list[BaseMessage], googl
     # Use the fast model for the head-to-head comparison
     fast_llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=google_api_key)
     
-    # --- NEW: Format messages for Gemini ---
+    # Format messages for Gemini
     gemini_messages = history + [HumanMessage(content=query)]
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        # --- MODIFIED: Pass history to both models ---
+        # Pass history to both models
         future_gemini = executor.submit(lambda: fast_llm.invoke(gemini_messages).content)
         future_groq = executor.submit(query_groq, query, history, groq_api_key) # <-- pass history
         
@@ -246,7 +246,7 @@ class AgentState(TypedDict):
     history: list[BaseMessage]
     final_response: Optional[any]
 
-# --- *** (CHANGE 4: Modify call_comparison_tool to pass history) *** ---
+# --- (FIX 4: call_comparison_tool now passes history from the state) ---
 def call_comparison_tool(state: AgentState, google_api_key: str, groq_api_key: str, mistral_api_key: str):
     response = comparison_and_evaluation_tool(
         state['query'],
@@ -265,13 +265,13 @@ def call_web_search_tool(state: AgentState, tavily_api_key: str, google_api_key:
     response = web_search_tool(state['query'], tavily_api_key, google_api_key)
     return {"final_response": response}
 
-# --- *** (CHANGE 5: Modify router to use history) *** ---
+# --- (FIX 5: The router now reads history to make its decision) ---
 def router(state: AgentState, google_api_key: str):
     """The brain of the agent. Decides which tool to use and updates the 'route' state key."""
     print("---AGENT: Routing query---")
     router_llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=google_api_key)
     
-    # --- NEW: Format history for the router ---
+    # Format history for the router
     history = state.get('history', [])
     history_formatted = "\n".join(
         [f"{'Human' if msg.type == 'human' else 'AI'}: {msg.content}" for msg in history]
