@@ -161,19 +161,22 @@ st.title("🧠 AI Agent Workshop")
 st.write("I can search the web, create images, analyze documents, and more!")
 
 with st.sidebar:
-    # --- THIS IS THE FIXED SECTION ---
     st.header("🔍 Google Search")
     search_query = st.text_input("Search the web directly...", key="google_search")
+
     if st.button("Search"):
         if search_query:
             encoded_query = quote_plus(search_query)
-            # 1. Correctly format the URL
             search_url = f"https://www.google.com/search?q={encoded_query}"
-            # 2. Use st.link_button, which is built to handle external links safely
-            st.link_button("Open Google search results", url=search_url) 
+            # ✅ Save URL to session_state so it persists after rerun
+            st.session_state["search_url"] = search_url
         else:
             st.warning("Please enter a search query.")
-    # --- END OF FIXED SECTION ---
+
+    # ✅ Display the link button if URL is stored
+    if "search_url" in st.session_state:
+        st.link_button("Open Google search results", url=st.session_state["search_url"])
+
 
     st.header("📂 File Analysis")
     uploaded_file = st.file_uploader("Upload a file to ask questions about it", type=["pdf", "txt", "py", "js", "html", "css"])
