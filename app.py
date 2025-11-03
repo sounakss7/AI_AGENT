@@ -168,14 +168,10 @@ with st.sidebar:
         if search_query:
             encoded_query = quote_plus(search_query)
             search_url = f"https://www.google.com/search?q={encoded_query}"
-            # ✅ Save URL to session_state so it persists after rerun
-            st.session_state["search_url"] = search_url
+            js = f"window.open('{search_url}', '_blank').focus();"
+            st.markdown(f"<script>{js}</script>", unsafe_allow_html=True)
         else:
             st.warning("Please enter a search query.")
-
-    # ✅ Display the link button if URL is stored
-    if "search_url" in st.session_state:
-        st.link_button("Open Google search results", url=st.session_state["search_url"])
 
 
     st.header("📂 File Analysis")
