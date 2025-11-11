@@ -33,7 +33,8 @@ def query_groq(prompt: str, groq_api_key: str):
         resp = requests.post("https://api.groq.com/openai/v1/chat/completions", json=data, headers=headers)
         if resp.status_code == 200:
             content = resp.json()["choices"][0]["message"]["content"]
-            return f"#### Model: {model}\n\n{content}"
+            # Note: The model name (e.g., gpt-oss-120b) is already part of the response from query_groq
+            return content 
         return f"❌ Groq API Error: {resp.text}"
     except Exception as e:
         return f"⚠️ Groq Error: {e}"
@@ -41,13 +42,12 @@ def query_groq(prompt: str, groq_api_key: str):
 # --- NEW: Dedicated function to call Mistral for judging ---
 def query_mistral_judge(prompt: str, mistral_api_key: str):
     """A dedicated function to call Mistral for judging."""
-    # Using a small, fast model for the judging task
     model = "mistral-small-latest"
     headers = {"Authorization": f"Bearer {mistral_api_key}", "Content-Type": "application/json"}
     data = {"model": model, "messages": [{"role": "user", "content": prompt}], "max_tokens": 1024}
     try:
         resp = requests.post("https://api.mistral.ai/v1/chat/completions", json=data, headers=headers)
-        resp.raise_for_status() # Raise an error for bad status codes
+        resp.raise_for_status() 
         return resp.json()["choices"][0]["message"]["content"]
     except requests.exceptions.HTTPError as http_err:
         logging.error(f"Mistral Judge HTTP Error: {http_err} - {resp.text}")
@@ -79,7 +79,7 @@ def comparison_and_evaluation_tool(query: str, google_api_key: str, groq_api_key
     {query}
     ### Response A (Gemini):
     {gemini_response}
-    ### Response B (Groq):
+    ### Response B (Groq - OpenAI model):
     {groq_response}
 
     Instructions:
@@ -92,41 +92,45 @@ def comparison_and_evaluation_tool(query: str, google_api_key: str, groq_api_key
     judgment = query_mistral_judge(judge_prompt, mistral_api_key)
     
     match = re.search(r"winner\s*:\s*(gemini|groq)", judgment, re.IGNORECASE)
-    winner = match.group(1).capitalize() if match else "Evaluation"
+    winner_name = match.group(1).capitalize() if match else "Evaluation"
     
-    # --- THIS IS THE MODIFIED LOGIC ---
+    # --- THIS IS THE LOGIC YOU WANT ---
     
     chosen_answer = ""
     loser_response = ""
     loser_name = ""
 
-    if winner == "Gemini":
+    if winner_name == "Gemini":
         chosen_answer = gemini_response
         loser_response = groq_response
-        loser_name = "Groq"
-    elif winner == "Groq":
+        loser_name = "Groq (OpenAI model)" # <-- Explicitly named
+    elif winner_name == "Groq":
         chosen_answer = groq_response
         loser_response = gemini_response
-        loser_name = "Gemini"
+        loser_name = "Gemini" # <-- Explicitly named
     else:
         # Fallback if regex fails to find a clear winner
         chosen_answer = gemini_response # Default to Gemini
         loser_response = groq_response
-        loser_name = "Groq"
+        loser_name = "Groq (OpenAI model)"
 
-    final_output = f"### 🏆 Judged Best Answer ({winner})\n"
+    # Prepend the model name to the winning answer
+    if winner_name == "Gemini":
+        chosen_answer = f"#### Model: gemini-2.5-flash\n\n{chosen_answer}"
+    # The Groq response already includes its model name from the query_groq function
+
+    final_output = f"### 🏆 Judged Best Answer ({winner_name})\n"
     final_output += f"{chosen_answer}\n\n"
     final_output += f"### 🧠 Judge's Evaluation (from Mistral)\n{judgment}\n\n---\n\n"
 
-    # Now, only add the loser's response
-    if loser_name:
-        final_output += f"### Other Response ({loser_name})\n\n"
-        final_output += f"{loser_response}"
+    # Now, only add the loser's response with its name
+    final_output += f"### Other Response ({loser_name})\n\n"
+    
+    # Prepend model name to loser response if it's Gemini
+    if loser_name == "Gemini":
+         final_output += f"#### Model: gemini-2.5-flash\n\n{loser_response}"
     else:
-        # This will only run if the fallback above also fails (e.g., winner="Evaluation")
-        final_output += f"### All Responses\n\n"
-        final_output += f"**🤖 Gemini's Full Response:**\n{gemini_response}\n\n"
-        final_output += f"**⚡ Groq's Full Response:**\n{groq_response}"
+         final_output += f"{loser_response}" # Groq response already has it
 
     # --- END OF MODIFIED LOGIC ---
     
