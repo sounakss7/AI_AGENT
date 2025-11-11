@@ -64,11 +64,8 @@ def comparison_and_evaluation_tool(query: str, google_api_key: str, groq_api_key
     """
     print("---TOOL: Executing Comparison (Judged by Mistral)---")
     
-    # Use the fast model for the head-to-head comparison
     fast_llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=google_api_key)
     
-    # The Gemini judge_llm is no longer needed and has been removed.
-
     with concurrent.futures.ThreadPoolExecutor() as executor:
         future_gemini = executor.submit(lambda: fast_llm.invoke(query).content)
         future_groq = executor.submit(query_groq, query, groq_api_key)
@@ -91,23 +88,47 @@ def comparison_and_evaluation_tool(query: str, google_api_key: str, groq_api_key
     3. **Evaluate the responses purely on their merit for the given query. Do not show bias towards any model provider. Your judgment must be neutral and unbiased.**
     """
     
-    # --- THIS IS THE KEY CHANGE ---
-    # Use the new Mistral judge function instead of the Gemini judge
     print("---JUDGE: Calling Mistral for evaluation---")
     judgment = query_mistral_judge(judge_prompt, mistral_api_key)
-    # --- END OF KEY CHANGE ---
     
     match = re.search(r"winner\s*:\s*(gemini|groq)", judgment, re.IGNORECASE)
     winner = match.group(1).capitalize() if match else "Evaluation"
     
-    chosen_answer = gemini_response if winner == "Gemini" else groq_response
+    # --- THIS IS THE MODIFIED LOGIC ---
     
+    chosen_answer = ""
+    loser_response = ""
+    loser_name = ""
+
+    if winner == "Gemini":
+        chosen_answer = gemini_response
+        loser_response = groq_response
+        loser_name = "Groq"
+    elif winner == "Groq":
+        chosen_answer = groq_response
+        loser_response = gemini_response
+        loser_name = "Gemini"
+    else:
+        # Fallback if regex fails to find a clear winner
+        chosen_answer = gemini_response # Default to Gemini
+        loser_response = groq_response
+        loser_name = "Groq"
+
     final_output = f"### 🏆 Judged Best Answer ({winner})\n"
     final_output += f"{chosen_answer}\n\n"
     final_output += f"### 🧠 Judge's Evaluation (from Mistral)\n{judgment}\n\n---\n\n"
-    final_output += f"### Other Responses\n\n"
-    final_output += f"**🤖 Gemini's Full Response:**\n{gemini_response}\n\n"
-    final_output += f"**⚡ Groq's Full Response:**\n{groq_response}"
+
+    # Now, only add the loser's response
+    if loser_name:
+        final_output += f"### Other Response ({loser_name})\n\n"
+        final_output += f"{loser_response}"
+    else:
+        # This will only run if the fallback above also fails (e.g., winner="Evaluation")
+        final_output += f"### All Responses\n\n"
+        final_output += f"**🤖 Gemini's Full Response:**\n{gemini_response}\n\n"
+        final_output += f"**⚡ Groq's Full Response:**\n{groq_response}"
+
+    # --- END OF MODIFIED LOGIC ---
     
     return final_output
 
@@ -260,7 +281,7 @@ def router(state: AgentState, google_api_key: str):
     3.  `web_search_tool`: Use this for any query that requires real-time, up-to-date information. This includes questions about current events, news, weather, recent scientific discoveries, or topics created after 2023.
 
     User Query: "{query}"
-    Return ONLY the tool name (`comparison_tool` or `image_generation_tool` or `web_search_tool`).
+    Return ONLY the tool name (`comparison_tool`, `image_generation_tool`, or `web_search_tool`).
     """
     response = router_llm.invoke(router_prompt).content.strip()
     
