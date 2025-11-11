@@ -26,6 +26,7 @@ def choose_groq_model(prompt: str):
         return "llama-3.1-8b-instant"
 
 def query_groq(prompt: str, groq_api_key: str):
+    """Queries Groq and returns a dict with model_name and content, or an error string."""
     model = choose_groq_model(prompt)
     headers = {"Authorization": f"Bearer {groq_api_key}", "Content-Type": "application/json"}
     data = {"model": model, "messages": [{"role": "user", "content": prompt}], "max_tokens": 2048}
@@ -33,8 +34,8 @@ def query_groq(prompt: str, groq_api_key: str):
         resp = requests.post("https://api.groq.com/openai/v1/chat/completions", json=data, headers=headers)
         if resp.status_code == 200:
             content = resp.json()["choices"][0]["message"]["content"]
-            # Note: The model name (e.g., gpt-oss-120b) is already part of the response from query_groq
-            return content 
+            # ---MODIFIED: Return a dict to include the model name ---
+            return {"model_name": model, "content": content} 
         return f"❌ Groq API Error: {resp.text}"
     except Exception as e:
         return f"⚠️ Groq Error: {e}"
@@ -65,12 +66,25 @@ def comparison_and_evaluation_tool(query: str, google_api_key: str, groq_api_key
     print("---TOOL: Executing Comparison (Judged by Mistral)---")
     
     fast_llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=google_api_key)
+    gemini_model_name = "gemini-2.5-flash"
     
     with concurrent.futures.ThreadPoolExecutor() as executor:
         future_gemini = executor.submit(lambda: fast_llm.invoke(query).content)
         future_groq = executor.submit(query_groq, query, groq_api_key)
+        
         gemini_response = future_gemini.result()
-        groq_response = future_groq.result()
+        groq_result = future_groq.result()
+
+    # --- MODIFIED: Handle the dict or error string from query_groq ---
+    groq_response = ""
+    groq_model_name = "Groq (Error)"
+
+    if isinstance(groq_result, dict):
+        groq_response = groq_result["content"]
+        groq_model_name = groq_result["model_name"]
+    else:
+        # It's an error string
+        groq_response = groq_result
 
     judge_prompt = f"""
     You are an impartial AI evaluator. Compare two responses to a user's query and declare a winner.
@@ -79,7 +93,7 @@ def comparison_and_evaluation_tool(query: str, google_api_key: str, groq_api_key
     {query}
     ### Response A (Gemini):
     {gemini_response}
-    ### Response B (Groq - OpenAI model):
+    ### Response B (Groq - model: {groq_model_name}):
     {groq_response}
 
     Instructions:
@@ -94,43 +108,45 @@ def comparison_and_evaluation_tool(query: str, google_api_key: str, groq_api_key
     match = re.search(r"winner\s*:\s*(gemini|groq)", judgment, re.IGNORECASE)
     winner_name = match.group(1).capitalize() if match else "Evaluation"
     
-    # --- THIS IS THE LOGIC YOU WANT ---
+    # --- THIS IS THE NEW LOGIC YOU REQUESTED ---
     
     chosen_answer = ""
+    chosen_model_name = ""
     loser_response = ""
+    loser_model_name = ""
     loser_name = ""
 
     if winner_name == "Gemini":
         chosen_answer = gemini_response
+        chosen_model_name = gemini_model_name
         loser_response = groq_response
-        loser_name = "Groq (OpenAI model)" # <-- Explicitly named
+        loser_model_name = groq_model_name
+        loser_name = "Groq"
     elif winner_name == "Groq":
         chosen_answer = groq_response
+        chosen_model_name = groq_model_name
         loser_response = gemini_response
-        loser_name = "Gemini" # <-- Explicitly named
+        loser_model_name = gemini_model_name
+        loser_name = "Gemini"
     else:
         # Fallback if regex fails to find a clear winner
         chosen_answer = gemini_response # Default to Gemini
+        chosen_model_name = gemini_model_name
         loser_response = groq_response
-        loser_name = "Groq (OpenAI model)"
+        loser_model_name = groq_model_name
+        loser_name = "Groq"
 
-    # Prepend the model name to the winning answer
-    if winner_name == "Gemini":
-        chosen_answer = f"#### Model: gemini-2.5-flash\n\n{chosen_answer}"
-    # The Groq response already includes its model name from the query_groq function
 
+    # 1. The Winner's Response
     final_output = f"### 🏆 Judged Best Answer ({winner_name})\n"
-    final_output += f"{chosen_answer}\n\n"
+    final_output += f"#### Model: {chosen_model_name}\n\n{chosen_answer}\n\n"
+    
+    # 2. The Judge's Evaluation
     final_output += f"### 🧠 Judge's Evaluation (from Mistral)\n{judgment}\n\n---\n\n"
 
-    # Now, only add the loser's response with its name
+    # 3. The Loser's Response
     final_output += f"### Other Response ({loser_name})\n\n"
-    
-    # Prepend model name to loser response if it's Gemini
-    if loser_name == "Gemini":
-         final_output += f"#### Model: gemini-2.5-flash\n\n{loser_response}"
-    else:
-         final_output += f"{loser_response}" # Groq response already has it
+    final_output += f"#### Model: {loser_model_name}\n\n{loser_response}"
 
     # --- END OF MODIFIED LOGIC ---
     
