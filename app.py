@@ -3,7 +3,7 @@ import streamlit.components.v1 as components
 from PIL import Image
 from io import BytesIO
 from PyPDF2 import PdfReader
-import fitz # PyMuPDF
+import fitz
 import pytesseract
 from datetime import datetime
 import re
@@ -19,9 +19,6 @@ from gtts import gTTS
 
 # Import the agent logic
 from agent import build_agent, file_analysis_tool
-
-# --- NEW: Imports for chat history conversion ---
-from langchain.schema import HumanMessage, AIMessage, BaseMessage
 
 # --- NEW: A helper function to generate audio in memory ---
 def generate_audio_from_text(text: str) -> bytes | None:
@@ -50,47 +47,32 @@ def create_copy_button(text_to_copy: str, button_key: str):
     text_id = f"text_{button_key}"
 
     # The HTML part: a hidden element to hold the text and a button
-    # Note: Using st.markdown for the button to apply streamlit styling
     html_code = f"""
-        <textarea id="{text_id}" style="position: absolute; left: -9999px; opacity: 0;">{text_to_copy}</textarea>
-        <button id="{button_id}" class="stButton">Copy Text</button>
+        <textarea id="{text_id}" style="position: absolute; left: -9999px;">{text_to_copy}</textarea>
+        <button id="{button_id}">Copy Text</button>
     """
-    
+
     # The JavaScript part: finds the elements and adds the copy logic
     js_code = f"""
-<script>
-    // Ensure this script runs only once or can handle re-runs
-    if (!window.copyListeners) {{
-        window.copyListeners = new Set();
-    }}
-
-    if (!window.copyListeners.has("{button_id}")) {{
-        document.addEventListener('click', function(event) {{
-            if (event.target.id === "{button_id}") {{
+        <script>
+            document.getElementById("{button_id}").addEventListener("click", function() {{
                 var text = document.getElementById("{text_id}").value;
-                
                 navigator.clipboard.writeText(text).then(function() {{
                     var btn = document.getElementById("{button_id}");
-                    if (btn) {{
-                        var originalText = btn.innerHTML;
-                        btn.innerHTML = 'Copied!';
-                        setTimeout(function() {{
-                            btn.innerHTML = originalText;
-                        }}, 2000);
-                    }}
+                    var originalText = btn.innerHTML;
+                    btn.innerHTML = 'Copied!';
+                    setTimeout(function() {{
+                        btn.innerHTML = originalText;
+                    }}, 2000);
                 }}, function(err) {{
                     console.error('Could not copy text: ', err);
                 }});
-            }}
-        }}, {{ capture: true }}); // Use capture to ensure event is caught
-        window.copyListeners.add("{button_id}");
-    }}
-</script>
+            }});
+        </script>
     """
     
     # Combine and render using st.components.v1.html
     st.components.v1.html(html_code + js_code, height=50)
-
 # =======================================================
 # --- NEW: FUNCTION TO SET ANIMATED GRADIENT BG ---
 # =======================================================
@@ -98,6 +80,7 @@ def set_animated_fluid_background():
     """
     Sets a "Fluid Nebula" animated background - (Deep Blue & Purple theme)
     """
+    # NOTE: The "f" from f"""...""" has been removed to fix a SyntaxError
     st.markdown(
          """
         <style>
@@ -122,48 +105,16 @@ def set_animated_fluid_background():
             /* Base color is still dark indigo */
             background-color: rgba(10, 12, 39, 0.8);
         }
-        
-        /* Main chat area background */
         .st-emotion-cache-16txtl3 {
-            background-color: transparent; 
+            background-color: rgba(10, 12, 39, 0.8);
         }
-        
-        /* Chat bubbles are now tinted deep blue */
         [data-testid="chat-message-container"] {
+            /* Chat bubbles are now tinted deep blue */
             background-color: rgba(0, 31, 90, 0.7);
             border-radius: 10px;
             padding: 10px !important;
             margin-bottom: 10px;
         }
-        
-        /* Make Streamlit's default button match the copy button */
-        .stButton>button {
-            border-radius: 0.5rem;
-            padding: 0.5rem 1rem;
-            border: 1px solid #0052D4;
-            background-color: #001f5a;
-            color: white;
-        }
-        .stButton>button:hover {
-            background-color: #0a0c27;
-            border: 1px solid #4a0d6a;
-        }
-        
-        /* Style the custom copy button */
-        button#copy_btn {
-            border-radius: 0.5rem;
-            padding: 0.25rem 0.75rem;
-            font-size: 0.8rem;
-            border: 1px solid #0052D4;
-            background-color: #001f5a;
-            color: white;
-            margin-top: 10px;
-        }
-        button#copy_btn:hover {
-            background-color: #0a0c27;
-            border: 1px solid #4a0d6a;
-        }
-        
         </style>
         """,
          unsafe_allow_html=True
@@ -190,6 +141,7 @@ except KeyError as e:
 # ===============================================
 if "messages" not in st.session_state:
     st.session_state.messages = []
+# --- NEW: Add a key to store the agent's trace ---
 if "trajectory" not in st.session_state:
     st.session_state.trajectory = []
 if "metrics" not in st.session_state:
@@ -203,21 +155,25 @@ if "metrics" not in st.session_state:
     }
 
 # =====================
-# Main Application UI & Sidebar
+# Main Application UI & Sidebar (Unchanged)
 # =====================
 st.title("🧠 AI Agent Workshop")
-st.write("I can search the web, create images, analyze documents, and chain tasks together!")
+st.write("I can search the web, create images, analyze documents, and more!")
 
 with st.sidebar:
+    # --- THIS IS THE FIXED SECTION ---
     st.header("🔍 Google Search")
     search_query = st.text_input("Search the web directly...", key="google_search")
     if st.button("Search"):
         if search_query:
             encoded_query = quote_plus(search_query)
-            search_url = f"[https://www.google.com/search?q=](https://www.google.com/search?q=){encoded_query}"
+            # 1. Correctly format the URL
+            search_url = f"https://www.google.com/search?q={encoded_query}"
+            # 2. Use st.link_button, which is built to handle external links safely
             st.link_button("Open Google search results", url=search_url) 
         else:
             st.warning("Please enter a search query.")
+    # --- END OF FIXED SECTION ---
 
     st.header("📂 File Analysis")
     uploaded_file = st.file_uploader("Upload a file to ask questions about it", type=["pdf", "txt", "py", "js", "html", "css"])
@@ -225,7 +181,7 @@ with st.sidebar:
     st.header("🧭 Utilities")
     if st.button("Clear Chat History & Reset Metrics"):
         st.session_state.messages = []
-        st.session_state.trajectory = []
+        st.session_state.trajectory = [] # --- ADDED: Clear trajectory on reset ---
         st.session_state.metrics = {
             "total_requests": 0, "tool_usage": {"Comparison": 0, "Image Gen": 0, "Web Search": 0, "File Analysis": 0},
             "total_latency": 0.0, "average_latency": 0.0, "accuracy_feedback": {"👍": 0, "👎": 0}, "last_query_details": {}
@@ -234,12 +190,12 @@ with st.sidebar:
 
     st.markdown("### 💡 AI Tip of the Day")
     st.info(random.choice([
-        "Try a multi-step query! 'Search for the latest news on AI, then write an essay about it.'",
+        "The Comparison tool uses both Gemini 1.5 Flash and Llama 3.1 8B for a robust answer.",
         "Ask about current events to see the Web Search tool in action!",
         "Upload a Python file and ask for a score to test File Analysis."
     ]))
     
-    st.markdown("### 🕒 Live Server Time (IST)")
+    st.markdown("### 🕒 Live Server Time")
     st.info(datetime.now().strftime("%d %B %Y, %I:%M:%S %p"))
 
     st.header("🤖 Model Benchmarks")
@@ -323,37 +279,20 @@ for i, message in enumerate(st.session_state.messages):
                 key=f"download_btn_{i}"
             )
 
-# --- NEW: Helper function to convert chat history ---
-def convert_st_messages_to_langchain(st_messages: list[dict]) -> list[BaseMessage]:
-    """Converts Streamlit message history to LangChain BaseMessage objects."""
-    langchain_messages = []
-    for msg in st_messages:
-        if msg["role"] == "user":
-            langchain_messages.append(HumanMessage(content=msg.get("text", "")))
-        elif msg["role"] == "assistant":
-            # Only add text content to the history for the agent to read
-            if msg.get("text"):
-                langchain_messages.append(AIMessage(content=msg.get("text", "")))
-    return langchain_messages
-
 # =================================================================================
-# --- MODIFIED: AGDebugger Logic to handle multi-step responses ---
+# --- AGDebugger Logic (Unchanged) ---
 # =================================================================================
-async def run_agent_and_capture_trajectory(agent, prompt: str, history: list[BaseMessage]):
+async def run_agent_and_capture_trajectory(agent, prompt):
     """
-    Runs the agent using astream_events and captures a detailed trace,
-    the final list of responses, and all tools used.
+    Runs the agent using astream_events and captures a detailed trace of its execution,
+    including inputs and outputs for each step.
     """
     trace_steps = []
     current_step = {}
-    # --- MODIFIED: Capture a list of responses and tools ---
-    all_responses = []
-    tools_used = []
+    final_response = None
+    tool_used = "N/A"
 
-    # This is the input to the graph
-    config = {"query": prompt, "history": history, "intermediate_responses": []}
-
-    async for event in agent.astream_events(config, version="v1"):
+    async for event in agent.astream_events({"query": prompt}, version="v1"):
         kind = event["event"]
         
         if kind == "on_chain_start":
@@ -363,15 +302,10 @@ async def run_agent_and_capture_trajectory(agent, prompt: str, history: list[Bas
                     "input": event["data"].get("input"),
                     "output": None
                 }
-                # --- MODIFIED: Capture friendly tool names in a list ---
-                tool_name = "N/A"
-                if event['name'] == "comparison_chat": tool_name = "Comparison"
-                elif event['name'] == "image_generator": tool_name = "Image Gen"
-                elif event['name'] == "web_search": tool_name = "Web Search"
-                
-                # Only add if it's a tool (not 'router') and not already logged
-                if tool_name != "N/A" and tool_name not in tools_used:
-                    tools_used.append(tool_name)
+                # Capture the friendly tool name
+                if event['name'] == "comparison_chat": tool_used = "Comparison"
+                elif event['name'] == "image_generator": tool_used = "Image Gen"
+                elif event['name'] == "web_search": tool_used = "Web Search"
 
         if kind == "on_chain_end":
             if event["name"] != "LangGraph":
@@ -381,160 +315,106 @@ async def run_agent_and_capture_trajectory(agent, prompt: str, history: list[Bas
                     trace_steps.append(current_step)
                     current_step = {}
                 
-                # --- MODIFIED: Get the full list of intermediate responses ---
-                if isinstance(output, dict) and 'intermediate_responses' in output:
-                    all_responses = output['intermediate_responses']
+                if isinstance(output, dict) and 'final_response' in output:
+                    final_response = output['final_response']
 
-    # --- MODIFIED: Return the list of responses and tools ---
-    return all_responses, trace_steps, tools_used
+    return final_response, trace_steps, tool_used
 
 def pretty_print_dict(d):
-    """Utility to safely print dictionaries containing complex objects."""
     def safe_converter(o):
         if isinstance(o, (Image.Image, bytes)):
             return f"<{type(o).__name__} object>"
-        if isinstance(o, BaseMessage):
-            return f"[{o.type}] {str(o.content)[:100]}..."
-        try:
-            return str(o)
-        except Exception:
-            return f"<Unserializable object: {type(o).__name__}>"
+        return str(o)
     
     if not isinstance(d, dict):
-        return f"```\n{safe_converter(d)}\n```"
+        return f"```\n{str(d)}\n```"
         
     return "```json\n" + json.dumps(d, indent=2, default=safe_converter) + "\n```"
 
 
 # =================================================================================
-# --- MODIFIED: Main Chat Input Logic (Handles history and multi-step output) ---
+# --- MODIFIED: Main Chat Input Logic (REMOVED automatic audio generation) ---
 # =================================================================================
 if prompt := st.chat_input("Ask about the latest news, create an image, or query a file..."):
     st.session_state.messages.append({"role": "user", "text": prompt})
     
-    start_time = time.time()
-    tools_used_list = [] # --- MODIFIED: Now a list
+    with st.chat_message("assistant"):
+        with st.spinner("Agent is working..."):
+            start_time = time.time()
+            tool_used_key = ""
 
-    if uploaded_file:
-        # --- This is the File Analysis Path (Bypasses agent) ---
-        tools_used_list = ["File Analysis"]
-        with st.chat_message("assistant"):
-            with st.spinner("Analyzing file..."):
+            if uploaded_file:
+                # --- This is the File Analysis Path ---
+                tool_used_key = "File Analysis"
                 file_bytes = uploaded_file.read()
                 file_text = ""
-                
                 if "pdf" in uploaded_file.type:
-                    try:
-                        reader = PdfReader(BytesIO(file_bytes))
-                        for page in reader.pages: file_text += page.extract_text() or ""
-                    except Exception as e:
-                        st.warning(f"PyPDF2 failed ({e}), falling back to OCR...")
-                        file_text = "" # Ensure it's empty to trigger OCR
-                        
+                    reader = PdfReader(BytesIO(file_bytes))
+                    for page in reader.pages: file_text += page.extract_text() or ""
                     if not file_text.strip():
                         st.info("No text layer found, performing OCR...")
-                        try:
-                            doc = fitz.open(stream=file_bytes, filetype="pdf")
-                            for page in doc:
-                                pix = page.get_pixmap()
-                                img = Image.open(BytesIO(pix.tobytes("png")))
-                                file_text += pytesseract.image_to_string(img)
-                            doc.close()
-                        except Exception as ocr_e:
-                            st.error(f"OCR failed: {ocr_e}")
-                            file_text = "Error: Could not read PDF."
+                        doc = fitz.open(stream=file_bytes, filetype="pdf")
+                        for page in doc:
+                            pix = page.get_pixmap()
+                            img = Image.open(BytesIO(pix.tobytes("png")))
+                            file_text += pytesseract.image_to_string(img)
                 else:
-                    try:
-                        file_text = file_bytes.decode("utf-8")
-                    except UnicodeDecodeError:
-                        file_text = file_bytes.decode("latin-1", errors="ignore")
+                    file_text = file_bytes.decode("utf-8", errors="ignore")
                 
                 response_stream = file_analysis_tool(prompt, file_text, google_api_key)
                 full_response = st.write_stream(response_stream)
                 
+                # --- MODIFIED: Store None for audio, it will be generated on-demand ---
                 st.session_state.messages.append({"role": "assistant", "text": full_response, "audio_bytes": None})
-    
-    else:
-        # --- MODIFIED: This is the Agent Path (Multi-Step) ---
-        with st.spinner("Agent is working..."):
-            agent = build_agent(google_api_key, groq_api_key, pollinations_token, tavily_api_key, mistral_api_key)
             
-            # --- NEW: Convert history for the agent ---
-            # We pass all messages *except* the last one (which is the new prompt)
-            langchain_history = convert_st_messages_to_langchain(st.session_state.messages[:-1])
-            
-            # --- MODIFIED: Run agent and get lists back ---
-            step_responses, trace_steps, tools_used_list = asyncio.run(
-                run_agent_and_capture_trajectory(agent, prompt, langchain_history)
-            )
-            st.session_state.trajectory.append({"prompt": prompt, "steps": trace_steps})
-
-        # --- NEW: Loop through each step and display it as a separate message ---
-        if not step_responses:
-            with st.chat_message("assistant"):
-                error_msg = "Sorry, I ran into an issue and couldn't complete the task."
-                st.markdown(error_msg)
-                st.session_state.messages.append({"role": "assistant", "text": error_msg, "audio_bytes": None})
-        
-        for i, response in enumerate(step_responses):
-            is_last_step = (i == len(step_responses) - 1)
-            
-            with st.chat_message("assistant"):
-                if isinstance(response, str):
-                    st.markdown(response)
-                    st.session_state.messages.append({"role": "assistant", "text": response, "audio_bytes": None})
+            else:
+                # --- This is the Agent Path ---
+                agent = build_agent(google_api_key, groq_api_key, pollinations_token, tavily_api_key, mistral_api_key)
                 
-                elif isinstance(response, dict) and "image" in response:
-                    img_data = response["image"]
+                final_response, trace_steps, tool_used_key = asyncio.run(run_agent_and_capture_trajectory(agent, prompt))
+                st.session_state.trajectory.append({"prompt": prompt, "steps": trace_steps})
+
+                if isinstance(final_response, str):
+                    st.markdown(final_response)
+                    # --- MODIFIED: Store None for audio ---
+                    st.session_state.messages.append({"role": "assistant", "text": final_response, "audio_bytes": None})
+                
+                elif isinstance(final_response, dict) and "image" in final_response:
+                    img_data = final_response["image"]
                     buf = BytesIO()
                     img_data.save(buf, format="PNG")
                     byte_im = buf.getvalue()
-                    
-                    caption = response.get("caption", "Generated image")
-                    st.image(byte_im, caption=caption)
+                    st.image(byte_im, caption=final_response.get("caption", prompt))
                     st.session_state.messages.append({
-                        "role": "assistant", 
-                        "image_bytes": byte_im, 
-                        "text": f"Image generated: *{caption}*",
-                        "caption": caption
+                        "role": "assistant", "image_bytes": byte_im, "text": f"Image generated for: *{prompt}*",
+                        "caption": final_response.get("caption", prompt)
+                        # No audio for image-only responses
                     })
                 
                 else:
-                    error_message = response.get("error", f"An intermediate step failed: {response}")
+                    error_message = final_response.get("error", "Sorry, something went wrong.")
                     st.markdown(f"Error: {error_message}")
+                    # --- MODIFIED: Store None for audio ---
                     st.session_state.messages.append({"role": "assistant", "text": f"Error: {error_message}", "audio_bytes": None})
             
-            # Add a visual pause to show the agent "thinking"
-            if not is_last_step:
-                with st.spinner("Agent is continuing to the next step..."):
-                    time.sleep(1.5) # Visual pause
-    
-    # --- Metrics Recording (logic is now modified for list) ---
-    end_time = time.time()
-    latency = end_time - start_time
-    metrics = st.session_state.metrics
-    metrics["total_requests"] += 1
-    
-    # --- MODIFIED: Log all tools used in the chain ---
-    if tools_used_list:
-        for tool_name in tools_used_list:
-            if tool_name in metrics["tool_usage"]:
-                metrics["tool_usage"][tool_name] += 1
-    else:
-        if not uploaded_file: # If it was an agent run but no tools were identified (e.g., error)
-            pass # We might want to log this as a "Routing Error"
+            # --- Metrics Recording (logic is unchanged) ---
+            # This timer now stops *before* any audio is generated, giving an accurate latency.
+            end_time = time.time()
+            latency = end_time - start_time
+            metrics = st.session_state.metrics
+            metrics["total_requests"] += 1
+            if tool_used_key and tool_used_key in metrics["tool_usage"]:
+                metrics["tool_usage"][tool_used_key] += 1
+            metrics["total_latency"] += latency
+            metrics["average_latency"] = metrics["total_latency"] / metrics["total_requests"]
+            metrics["last_query_details"] = {
+                "timestamp": datetime.now().isoformat(), "prompt": prompt,
+                "tool_used": tool_used_key, "latency_seconds": round(latency, 2)
+            }
             
-    metrics["total_latency"] += latency
-    metrics["average_latency"] = metrics["total_latency"] / metrics["total_requests"]
-    metrics["last_query_details"] = {
-        "timestamp": datetime.now().isoformat(), "prompt": prompt,
-        "tool_used": ", ".join(tools_used_list) if tools_used_list else "N/A", # <-- Now shows all tools
-        "latency_seconds": round(latency, 2)
-    }
-    
-    st.rerun()
+            st.rerun()
 
-# --- MODIFIED: Debug View ---
+# --- MODIFIED: Debug View (Unchanged from your version) ---
 if st.session_state.trajectory:
     with st.expander("🕵️ Agent Trajectory / Debug View", expanded=False):
         for run in reversed(st.session_state.trajectory):
@@ -542,9 +422,6 @@ if st.session_state.trajectory:
             
             steps = run.get('steps', [])
             
-            if not steps:
-                st.write("No steps were captured for this run. This might indicate a routing failure.")
-                
             for step in steps:
                 st.markdown(f"##### 🎬 Step: `{step.get('name', 'Unknown Step')}`")
                 
@@ -558,10 +435,10 @@ if st.session_state.trajectory:
             
             st.markdown("---")
 
-# --- Feedback buttons logic ---
+# --- Feedback buttons logic (Unchanged) ---
 if st.session_state.messages and st.session_state.messages[-1]["role"] == "assistant":
     message_id = len(st.session_state.messages) - 1
-    
+
     if f"feedback_{message_id}" not in st.session_state:
         feedback_cols = st.columns(10)
         if feedback_cols[0].button("👍", key=f"good_{message_id}"):
