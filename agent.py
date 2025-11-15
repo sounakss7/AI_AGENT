@@ -160,7 +160,31 @@ def image_generation_tool(prompt: str, google_api_key: str, pollinations_token: 
     logging.info(f"---TOOL: Generating Image for prompt: '{prompt}'---")
     try:
         enhancer_llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=google_api_key)
-        enhancer_prompt = f"Rewrite this short prompt into a detailed, vibrant, and realistic image generation description: {prompt}"
+        
+        # --- MODIFIED: This is the new "Top Class" prompt enhancer ---
+        enhancer_prompt = f"""
+You are a "Top Class" prompt engineer, a master of visual language. Your job is to rewrite a user's simple prompt into a hyper-detailed, vibrant, and masterful image generation description. The output must be optimized for a model like Pollinations.ai (which uses Stable Diffusion).
+
+The user's prompt is: "{prompt}"
+
+---
+**The Formula for a 'Top Class' Prompt (Follow this structure):**
+1.  **Core Subject:** Start with a hyper-detailed description of the main subject (e.g., "A majestic dragon with shimmering emerald scales and glowing blue eyes...").
+2.  **Style & Medium:** This is critical. `digital painting`, `photograph`, `oil on canvas`, `3D render`, `anime key visual`, `watercolor`.
+3.  **Scene & Environment:** Describe the background. `in a forgotten temple`, `on a neon-lit cyberpunk street`, `in a sun-drenched meadow`.
+4.  **Lighting & Atmosphere:** Set the mood. `cinematic lighting`, `volumetric god rays`, `eerie, foggy night`, `warm afternoon sun`, `dramatic shadows`.
+5.  **Artist & Platform Keywords:** This adds huge power. `trending on ArtStation`, `Unreal Engine 5`, `V-Ray render`, `by Greg Rutkowski and Artgerm`.
+6.  **Technical Details:** The "magic keywords." `8k`, `UHD`, `hyper-detailed`, `intricate details`, `sharp focus`, `depth of field (bokeh)`, `f/1.8`.
+
+---
+**Example Transformation:**
+* **User Prompt:** "a cat in a hat"
+* **Your 'Top Class' Prompt:** "A hyper-detailed, photorealistic 8k close-up portrait of a fluffy ginger cat wearing a tiny, dapper felt fedora, cinematic lighting with a shallow depth of field, sharp focus on the cat's vibrant green eyes, trending on ArtStation, shot on a Sony A7R IV."
+
+Now, transform the user's prompt into a 'Top Class' masterpiece.
+"""
+        # --- END OF MODIFIED SECTION ---
+        
         final_prompt = enhancer_llm.invoke(enhancer_prompt).content.strip()
         
         encoded_prompt = quote_plus(final_prompt)
@@ -187,7 +211,6 @@ def image_generation_tool(prompt: str, google_api_key: str, pollinations_token: 
     except Exception as e:
         logging.error(f"An unexpected error occurred in image generation: {e}")
         return {"error": f"Failed to generate image: {e}"}
-
 # ===================================================================
 # TOOL 3: FILE ANALYSIS TOOL (Unchanged)
 # ===================================================================
