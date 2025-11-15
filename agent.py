@@ -160,7 +160,7 @@ def image_generation_tool(prompt: str, google_api_key: str, pollinations_token: 
     logging.info(f"---TOOL: Generating Image for prompt: '{prompt}'---")
     try:
         enhancer_llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=google_api_key)
-        enhancer_prompt = f"Rewrite this short prompt into a detailed, vibrant, and artistic image generation description: {prompt}"
+        enhancer_prompt = f"Rewrite this short prompt into a detailed, vibrant, and realistic image generation description: {prompt}"
         final_prompt = enhancer_llm.invoke(enhancer_prompt).content.strip()
         
         encoded_prompt = quote_plus(final_prompt)
