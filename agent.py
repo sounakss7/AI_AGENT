@@ -163,7 +163,7 @@ def image_generation_tool(prompt: str, google_api_key: str, pollinations_token: 
         
         # --- MODIFIED: This is the new "Top Class" prompt enhancer ---
         enhancer_prompt = f"""
-You are a "Top Class" prompt engineer, a master of visual language. Your job is to rewrite a user's simple prompt into a hyper-detailed, vibrant, and masterful image generation description. The output must be optimized for a model like Pollinations.ai (which uses Stable Diffusion).
+You are a "Top Class" prompt engineer, a master of visual language. Your job is to rewrite a user's simple prompt into a hyper-detailed, vibrant, and masterful image generation description. The output must be optimized for a model like Pollinations.ai (which uses Stable Diffusion). The image generation should be highly precised.
 
 The user's prompt is: "{prompt}"
 
